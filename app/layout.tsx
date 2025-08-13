@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { Providers } from "@/components/providers" // ⬅️ import our wrapper
 
 const inter = Inter({
   subsets: ["latin"],
@@ -30,7 +31,11 @@ export default function RootLayout({
         {/* Fallback for browsers that don't handle metadata.icons */}
         <link rel="icon" href="/logo.svg" type="image/svg+xml" />
       </head>
-      <body className={`${inter.className} antialiased`}>{children}</body>
+      <body className={`${inter.className} antialiased`}>
+        <Providers>
+          {children}
+        </Providers>
+      </body>
     </html>
   )
 }

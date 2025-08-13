@@ -14,7 +14,7 @@ interface PasswordInputProps extends React.InputHTMLAttributes<HTMLInputElement>
   isValid?: boolean
   showStrengthIndicator?: boolean
 }
-
+ 
 const calculatePasswordStrength = (password: string): { score: number; feedback: string[] } => {
   const feedback: string[] = []
   let score = 0

@@ -1,51 +1,75 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { AuthShell } from "@/components/auth/AuthShell"
 import { GradientText } from "@/components/auth/GradientText"
 import { AuthTabs } from "@/components/auth/AuthTabs"
 import { LoginForm } from "@/components/auth/LoginForm"
 import { RegisterForm } from "@/components/auth/RegisterForm"
 import { AuthFooterNote } from "@/components/auth/AuthFooterNote"
+import { useLoginMutation, useRegisterMutation } from "@/hooks/use-auth-mutations"
+
+type FieldErrors = Record<string, string[]>
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login")
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleLogin = async (data: any) => {
-    setIsSubmitting(true)
-    try {
-      // TODO: Implement actual login logic
-      console.log("Login data:", data)
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate API call
-    } catch (error) {
-      console.error("Login error:", error)
-    } finally {
-      setIsSubmitting(false)
-    }
+  // --- Server error plumbing for Login ---
+  const [loginSummaryErrors, setLoginSummaryErrors] = useState<string[]>([])
+  const [loginFieldErrors, setLoginFieldErrors] = useState<FieldErrors>({})
+
+  const loginMutation = useLoginMutation({
+    setTopLevelError: (msg) => setLoginSummaryErrors((prev) => (msg ? [msg, ...prev] : prev)),
+    setSummaryErrors: setLoginSummaryErrors,
+    setFieldError: (field, message) =>
+      setLoginFieldErrors((prev) => ({
+        ...prev,
+        [field]: [message],
+      })),
+  })
+
+  const handleLogin = async (data: Parameters<typeof loginMutation.mutateAsync>[0]) => {
+    // Clear old server errors before a new attempt
+    setLoginSummaryErrors([])
+    setLoginFieldErrors({})
+    await loginMutation.mutateAsync(data)
   }
 
-  const handleRegister = async (data: any) => {
-    setIsSubmitting(true)
-    try {
-      // TODO: Implement actual registration logic
-      console.log("Register data:", data)
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // Simulate API call
-    } catch (error) {
-      console.error("Registration error:", error)
-    } finally {
-      setIsSubmitting(false)
-    }
+  // --- Server error plumbing for Register ---
+  const [registerSummaryErrors, setRegisterSummaryErrors] = useState<string[]>([])
+  const [registerFieldErrors, setRegisterFieldErrors] = useState<FieldErrors>({})
+
+  const registerMutation = useRegisterMutation({
+    setTopLevelError: (msg) => setRegisterSummaryErrors((prev) => (msg ? [msg, ...prev] : prev)),
+    setSummaryErrors: setRegisterSummaryErrors,
+    setFieldError: (field, message) =>
+      setRegisterFieldErrors((prev) => ({
+        ...prev,
+        [field]: [message],
+      })),
+  })
+
+  const handleRegister = async (data: Parameters<typeof registerMutation.mutateAsync>[0]) => {
+    setRegisterSummaryErrors([])
+    setRegisterFieldErrors({})
+    await registerMutation.mutateAsync(data)
   }
+
+  const isSubmitting = useMemo(
+    () => (activeTab === "login" ? loginMutation.isPending : registerMutation.isPending),
+    [activeTab, loginMutation.isPending, registerMutation.isPending],
+  )
 
   const logo = (
     <div className="text-center">
-      <GradientText as="h1" className="text-3xl font-bold mb-2">
-        180Pi
-      </GradientText>
-      <p className="text-gray-600 text-sm">Climate-intelligent investment simulation</p>
+      <img
+        src="/logo.webp"
+        alt="180Pi Logo"
+        className="mx-auto h-16 w-auto"
+      />
     </div>
   )
+
 
   return (
     <AuthShell logo={logo}>
@@ -63,22 +87,32 @@ export default function AuthPage() {
 
         <AuthTabs activeTab={activeTab} onTabChange={setActiveTab}>
           {activeTab === "login" ? (
-            <LoginForm onSubmit={handleLogin} isSubmitting={isSubmitting} />
+            <LoginForm
+              onSubmit={handleLogin}
+              isSubmitting={isSubmitting}
+              serverSummaryErrors={loginSummaryErrors}
+              serverFieldErrors={loginFieldErrors}
+            />
           ) : (
-            <RegisterForm onSubmit={handleRegister} isSubmitting={isSubmitting} />
+            <RegisterForm
+              onSubmit={handleRegister}
+              isSubmitting={isSubmitting}
+              serverSummaryErrors={registerSummaryErrors}
+              serverFieldErrors={registerFieldErrors}
+            />
           )}
         </AuthTabs>
 
-        <AuthFooterNote>
-          By continuing, you agree to our{" "}
+        {/* <AuthFooterNote> */}
+          {/* By continuing, you agree to our{" "}
           <a href="/terms" className="text-blue-600 hover:text-blue-800 smooth-transition">
             Terms of Service
           </a>{" "}
           and{" "}
           <a href="/privacy" className="text-blue-600 hover:text-blue-800 smooth-transition">
             Privacy Policy
-          </a>
-        </AuthFooterNote>
+          </a> */}
+        {/* </AuthFooterNote> */}
       </div>
     </AuthShell>
   )

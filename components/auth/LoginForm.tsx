@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -19,29 +20,47 @@ type LoginFormData = z.infer<typeof loginSchema>
 interface LoginFormProps {
   onSubmit: (data: LoginFormData) => Promise<void>
   isSubmitting?: boolean
+  serverSummaryErrors?: string[]
+  serverFieldErrors?: Record<string, string[]>
 }
 
-export function LoginForm({ onSubmit, isSubmitting = false }: LoginFormProps) {
+export function LoginForm({
+  onSubmit,
+  isSubmitting = false,
+  serverSummaryErrors = [],
+  serverFieldErrors = {},
+}: LoginFormProps) {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, touchedFields },
     watch,
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    mode: "onBlur", // Enable real-time validation
+    mode: "onBlur",
   })
+
+  // Apply server field errors
+  useEffect(() => {
+    Object.entries(serverFieldErrors).forEach(([field, messages]) => {
+      if (!messages || messages.length === 0) return
+      setError(field as keyof LoginFormData, { type: "server", message: messages[0] })
+    })
+  }, [serverFieldErrors, setError])
 
   const watchedEmail = watch("email")
   const watchedPassword = watch("password")
 
-  const errorMessages = Object.values(errors)
-    .map((error) => error.message)
+  const clientErrors = Object.values(errors)
+    .map((e) => e?.message)
     .filter(Boolean) as string[]
+
+  const summaryErrors = [...serverSummaryErrors, ...clientErrors]
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <ValidationSummary errors={errorMessages} />
+      <ValidationSummary errors={summaryErrors} />
 
       <FormTextInput
         id="login-email"
@@ -67,14 +86,14 @@ export function LoginForm({ onSubmit, isSubmitting = false }: LoginFormProps) {
       />
 
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
+        {/* <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input type="checkbox" className="custom-checkbox" {...register("rememberMe")} />
           <span className="text-gray-700">Remember me</span>
-        </label>
+        </label> */}
 
-        <a href="/auth/forgot" className="text-sm text-blue-600 hover:text-blue-800 smooth-transition">
+        {/* <a href="/auth/forgot" className="text-sm text-blue-600 hover:text-blue-800 smooth-transition">
           Forgot password?
-        </a>
+        </a> */}
       </div>
 
       <SubmitButton isLoading={isSubmitting} type="submit">

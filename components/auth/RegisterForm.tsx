@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -26,28 +27,49 @@ type RegisterFormData = z.infer<typeof registerSchema>
 interface RegisterFormProps {
   onSubmit: (data: RegisterFormData) => Promise<void>
   isSubmitting?: boolean
+  /** Extra errors coming from the server (top-level summary) */
+  serverSummaryErrors?: string[]
+  /** Server field errors keyed by form field name */
+  serverFieldErrors?: Record<string, string[]>
 }
 
-export function RegisterForm({ onSubmit, isSubmitting = false }: RegisterFormProps) {
+export function RegisterForm({
+  onSubmit,
+  isSubmitting = false,
+  serverSummaryErrors = [],
+  serverFieldErrors = {},
+}: RegisterFormProps) {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, touchedFields },
     watch,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
-    mode: "onBlur", // Enable real-time validation
+    mode: "onBlur",
   })
 
-  const watchedFields = watch()
+  // Apply server-side field errors to RHF
+  useEffect(() => {
+    Object.entries(serverFieldErrors).forEach(([field, messages]) => {
+      if (!messages || messages.length === 0) return
+      setError(field as keyof RegisterFormData, { type: "server", message: messages[0] })
+    })
+  }, [serverFieldErrors, setError])
 
-  const errorMessages = Object.values(errors)
-    .map((error) => error.message)
+  const watched = watch()
+
+  // Combine client validation errors with server summary errors
+  const clientErrors = Object.values(errors)
+    .map((e) => e?.message)
     .filter(Boolean) as string[]
+
+  const summaryErrors = [...serverSummaryErrors, ...clientErrors]
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <ValidationSummary errors={errorMessages} />
+      <ValidationSummary errors={summaryErrors} />
 
       <FormTextInput
         id="register-name"
@@ -56,7 +78,7 @@ export function RegisterForm({ onSubmit, isSubmitting = false }: RegisterFormPro
         placeholder="Enter your full name"
         error={errors.name?.message}
         showValidation={touchedFields.name}
-        isValid={touchedFields.name && !errors.name && !!watchedFields.name}
+        isValid={touchedFields.name && !errors.name && !!watched.name}
         required
         {...register("name")}
       />
@@ -68,7 +90,7 @@ export function RegisterForm({ onSubmit, isSubmitting = false }: RegisterFormPro
         placeholder="Enter your email"
         error={errors.email?.message}
         showValidation={touchedFields.email}
-        isValid={touchedFields.email && !errors.email && !!watchedFields.email}
+        isValid={touchedFields.email && !errors.email && !!watched.email}
         required
         {...register("email")}
       />
@@ -80,7 +102,7 @@ export function RegisterForm({ onSubmit, isSubmitting = false }: RegisterFormPro
         helperText="Must be at least 8 characters with uppercase, lowercase, and number"
         error={errors.password?.message}
         showValidation={touchedFields.password}
-        isValid={touchedFields.password && !errors.password && !!watchedFields.password}
+        isValid={touchedFields.password && !errors.password && !!watched.password}
         showStrengthIndicator={true}
         required
         {...register("password")}
@@ -93,7 +115,7 @@ export function RegisterForm({ onSubmit, isSubmitting = false }: RegisterFormPro
         placeholder="Enter your company name"
         error={errors.companyName?.message}
         showValidation={touchedFields.companyName}
-        isValid={touchedFields.companyName && !errors.companyName && !!watchedFields.companyName}
+        isValid={touchedFields.companyName && !errors.companyName && !!watched.companyName}
         required
         {...register("companyName")}
       />

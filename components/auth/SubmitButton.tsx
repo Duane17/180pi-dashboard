@@ -24,12 +24,13 @@ export function SubmitButton({
       disabled={disabled || isLoading}
       className={cn(
         "w-full px-6 py-3 rounded-lg font-medium smooth-transition-250",
-        "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
+        "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#3270a1]",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         "hover:scale-105 active:scale-95",
         isPrimary && [
           "text-white shadow-lg",
-          "bg-gradient-to-r from-teal-400 via-blue-500 to-purple-600",
+          // Updated gradient to mirror logo colors
+          " bg-gradient-to-r from-[#7ac0f6] to-[#7503c1]",
           "hover:gradient-pan",
           !disabled && !isLoading && "hover:shadow-xl",
         ],
