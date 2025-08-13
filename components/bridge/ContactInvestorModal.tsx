@@ -173,7 +173,7 @@ Best regards,`,
                 <Paperclip className="h-4 w-4 text-gray-600" />
                 <div>
                   <Label htmlFor="attachments" className="text-sm font-medium">
-                    Include Company Profile & ESG Data
+                    Include Company Profile & Sustainability Data
                   </Label>
                   <p className="text-xs text-gray-600">Attach relevant documents to support your inquiry</p>
                 </div>

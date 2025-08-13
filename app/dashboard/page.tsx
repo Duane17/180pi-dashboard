@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { AppShell } from "@/components/layout/AppShell"
 import { KpiGrid } from "@/components/dashboard/KpiGrid"
 import { YearSelector } from "@/components/dashboard/YearSelector"
@@ -11,6 +11,9 @@ import { ValidationButton } from "@/components/validation/ValidationButton"
 import { ValidationSummaryModal, type ValidationIssue } from "@/components/validation/ValidationSummaryModal"
 import { RoleGuard } from "@/components/rbac/RoleGuard"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { useLogoutMutation } from "@/hooks/use-auth-mutations"
 
 // Mock data for demonstration
 const mockKpiData = {
@@ -113,6 +116,31 @@ export default function DashboardPage() {
   const [validationModalOpen, setValidationModalOpen] = useState(false)
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([])
   const [announcement, setAnnouncement] = useState("")
+  const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth()
+  const logout = useLogoutMutation()
+  const router = useRouter()
+
+
+  const shellUser = useMemo(
+    () =>
+      authUser
+        ? {
+            id: authUser.id,
+            name: authUser.name,
+            email: authUser.email,
+            role: "admin" as const,
+          }
+        : undefined,
+    [authUser]
+  )
+
+  // Redirect to /auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push("/auth")
+    }
+  }, [authLoading, isAuthenticated, router])
+
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -121,6 +149,10 @@ export default function DashboardPage() {
     }, 1000)
     return () => clearTimeout(timer)
   }, [])
+
+  if (authLoading || (!isAuthenticated && !authLoading)) {
+    return null // Avoid flicker while deciding
+  }
 
   const handleValidateData = async () => {
     setValidationState("loading")
@@ -183,27 +215,27 @@ export default function DashboardPage() {
 
   const currentKpis = mockKpiData[selectedYear as keyof typeof mockKpiData] || mockKpiData["2024"]
 
-  const mockUser = {
-    id: "1",
-    name: "Maha Chairi",
-    email: "Maha@180pi.com",
-    role: "admin" as const,
-    permissions: ["dashboard.view", "data.validate", "reports.generate"],
-  }
+  // const mockUser = {
+  //   id: "1",
+  //   name: "Maha Chairi",
+  //   email: "Maha@180pi.com",
+  //   role: "admin" as const,
+  //   permissions: ["dashboard.view", "data.validate", "reports.generate"],
+  // }
 
   if (isError) {
     return (
       <AppShell
-        currentUser={mockUser}
+        currentUser={shellUser}
         onProfile={() => console.log("Navigate to profile")}
         onSettings={() => console.log("Navigate to settings")}
         onSwitchCompany={() => console.log("Switch company")}
-        onSignOut={() => console.log("Sign out")}
+        onSignOut={() => logout.mutate()}
       >
         <div className="max-w-2xl mx-auto mt-12">
           <ErrorState
             title="Dashboard Unavailable"
-            description="We're having trouble loading your ESG dashboard. Please check your connection and try again."
+            description="We're having trouble loading your Sustainability Intelligence dashboard. Please check your connection and try again."
             onRetry={handleRetry}
           />
         </div>
@@ -213,11 +245,11 @@ export default function DashboardPage() {
 
   return (
     <AppShell
-      currentUser={mockUser}
+      currentUser={shellUser}
       onProfile={() => console.log("Navigate to profile")}
       onSettings={() => console.log("Navigate to settings")}
       onSwitchCompany={() => console.log("Switch company")}
-      onSignOut={() => console.log("Sign out")}
+      onSignOut={() => logout.mutate()}
     >
       <div aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
@@ -226,7 +258,7 @@ export default function DashboardPage() {
       <div className="space-y-6 md:space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold gradient-text">ESG Dashboard</h1>
+            <h1 className="text-2xl md:text-3xl font-bold gradient-text">Sustainability Intelligence Dashboard</h1>
             <p className="text-[#4a4a4a] mt-1 text-sm md:text-base">
               Monitor your environmental, social, and governance metrics
             </p>
@@ -240,7 +272,7 @@ export default function DashboardPage() {
               disabled={isLoading}
             />
 
-            <RoleGuard allowed={["admin", "member"]} user={mockUser}>
+            <RoleGuard allowed={["admin", "member"]} user={shellUser}>
               <ValidationButton state={validationState} onClick={handleValidateData} disabled={isLoading} size="md" />
             </RoleGuard>
           </div>
@@ -288,7 +320,7 @@ export default function DashboardPage() {
             </h3>
             <p className="text-[#4a4a4a] mb-4 text-sm md:text-base">Need to update your metrics or generate reports?</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <RoleGuard allowed={["admin", "member"]} user={mockUser}>
+              <RoleGuard allowed={["admin", "member"]} user={shellUser}>
                 <Link
                   href="/upload/data"
                   className="px-4 md:px-6 py-2 bg-white border border-gray-300 text-[#1a1a1a] font-medium rounded-lg hover:bg-gray-50 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#3270a1]/20 inline-block"
@@ -297,7 +329,7 @@ export default function DashboardPage() {
                 </Link>
               </RoleGuard>
 
-              <RoleGuard permissions={["reports.generate"]} user={mockUser}>
+              <RoleGuard permissions={["reports.generate"]} user={shellUser}>
                 <Link
                   href="/reports"
                   className="px-4 md:px-6 py-2 bg-white border border-gray-300 text-[#1a1a1a] font-medium rounded-lg hover:bg-gray-50 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#3270a1]/20 inline-block"

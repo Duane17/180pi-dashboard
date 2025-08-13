@@ -1,7 +1,7 @@
 "use client"
 import { FormTextInput } from "./FormTextInput"
 import { SelectInput } from "./SelectInput"
-import { Users, DollarSign } from "lucide-react"
+import { Users, DollarSign, Lock, BarChart3 } from "lucide-react"
 
 interface SizeFinancesData {
   employeeCount: string
@@ -170,7 +170,7 @@ export function StepSizeFinances({ data, onChange, errors }: StepSizeFinancesPro
             <div>
               <h4 className="font-medium text-blue-900 mb-1">Why We Need This</h4>
               <p className="text-sm text-blue-800">
-                Company size and financial data help us provide appropriate ESG frameworks and benchmarking relevant to
+                Company size and financial data help us provide appropriate sustainability frameworks and benchmarking relevant to
                 your business scale.
               </p>
             </div>
@@ -180,12 +180,12 @@ export function StepSizeFinances({ data, onChange, errors }: StepSizeFinancesPro
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
             <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-white text-xs font-bold">🔒</span>
+              <Lock className="text-white w-3 h-3" />
             </div>
             <div>
               <h4 className="font-medium text-green-900 mb-1">Data Security</h4>
               <p className="text-sm text-green-800">
-                All financial information is encrypted and used solely for ESG reporting calibration. We never share
+                All financial information is encrypted and used solely for sustainability reporting calibration. We never share
                 sensitive business data.
               </p>
             </div>
@@ -196,12 +196,12 @@ export function StepSizeFinances({ data, onChange, errors }: StepSizeFinancesPro
       <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mt-6">
         <div className="flex items-start gap-3">
           <div className="w-5 h-5 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <span className="text-white text-xs font-bold">📊</span>
+            <BarChart3 className="text-white w-3 h-3" />
           </div>
           <div>
-            <h4 className="font-medium text-purple-900 mb-1">ESG Reporting Standards</h4>
+            <h4 className="font-medium text-purple-900 mb-1">Sustainability Reporting Standards</h4>
             <p className="text-sm text-purple-800">
-              Based on your company size, we'll recommend appropriate ESG reporting frameworks such as GRI, SASB, or
+              Based on your company size, we'll recommend appropriate Sustainability reporting frameworks such as GRI, SASB, or
               TCFD that align with regulatory requirements for your business scale.
             </p>
           </div>

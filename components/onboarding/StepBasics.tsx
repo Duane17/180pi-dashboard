@@ -1,17 +1,16 @@
-"use client"
-import { FormTextInput } from "./FormTextInput"
-import { SelectInput } from "./SelectInput"
+"use client";
+import { SelectInput } from "./SelectInput";
 
 interface BasicsData {
-  companyName: string
-  legalForm: string
-  sector: string
+  companyName: string;
+  legalForm: string;
+  sector: string;
 }
 
 interface StepBasicsProps {
-  data: BasicsData
-  onChange: (data: BasicsData) => void
-  errors?: Partial<Record<keyof BasicsData, string>>
+  data: BasicsData;
+  onChange: (data: BasicsData) => void;
+  errors?: Partial<Record<keyof BasicsData, string>>;
 }
 
 // Common legal forms for companies
@@ -23,7 +22,7 @@ const legalForms = [
   { value: "cooperative", label: "Cooperative" },
   { value: "nonprofit", label: "Non-Profit Organization" },
   { value: "other", label: "Other" },
-]
+];
 
 // Simplified NACE codes for major sectors
 const naceSectors = [
@@ -48,33 +47,32 @@ const naceSectors = [
   { value: "S", label: "S - Other service activities" },
   { value: "T", label: "T - Household activities" },
   { value: "U", label: "U - Extraterritorial organisations and bodies" },
-]
+];
 
 export function StepBasics({ data, onChange, errors }: StepBasicsProps) {
   const handleInputChange = (field: keyof BasicsData, value: string) => {
     onChange({
       ...data,
       [field]: value,
-    })
-  }
+    });
+  };
 
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-[#1a1a1a] mb-2">Company Basics</h2>
-        <p className="text-[#4a4a4a]">Let's start with some basic information about your company</p>
+        <p className="text-[#4a4a4a]">Let&apos;s start with some basic information about your company</p>
       </div>
 
       <div className="space-y-6">
-        <FormTextInput
-          label="Company Name"
-          placeholder="Enter your company name"
-          value={data.companyName}
-          onChange={(e) => handleInputChange("companyName", e.target.value)}
-          error={errors?.companyName}
-          required
-          helperText="The official registered name of your company"
-        />
+        {/* Company Name (read-only from registration/auth) */}
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-[#1a1a1a]">Company Name</label>
+          <div className="p-3 rounded-lg bg-gray-50 border border-gray-200 text-[#1a1a1a]">
+            {data.companyName || "—"}
+          </div>
+          <p className="text-xs text-[#4a4a4a]">This was set during registration.</p>
+        </div>
 
         <SelectInput
           label="Legal Form"
@@ -104,15 +102,15 @@ export function StepBasics({ data, onChange, errors }: StepBasicsProps) {
           <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
             <span className="text-white text-xs font-bold">i</span>
           </div>
-          <div>
+        <div>
             <h4 className="font-medium text-blue-900 mb-1">About NACE Codes</h4>
             <p className="text-sm text-blue-800">
               NACE (Nomenclature of Economic Activities) codes are used to classify business activities across the
-              European Union. This helps us provide more accurate ESG reporting tailored to your industry.
+              European Union. This helps us provide more accurate sustainability reporting tailored to your industry.
             </p>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

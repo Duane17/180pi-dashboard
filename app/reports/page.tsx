@@ -36,7 +36,7 @@ const mockTemplates: ReportTemplate[] = [
   {
     id: "1",
     name: "Annual Sustainability Report",
-    description: "Comprehensive ESG performance report with KPIs and narrative",
+    description: "Comprehensive sustainability performance report with KPIs and narrative",
     type: "sustainability",
     sections: ["Executive Summary", "Environmental KPIs", "Social Impact", "Governance", "Future Targets"],
     requiredData: [
@@ -225,7 +225,7 @@ export default function ReportsPage() {
               </h1>
             </div>
             <p className="text-gray-600 text-lg">
-              Create professional ESG reports using your uploaded data and evidence
+              Create professional sustainability performance reports using your uploaded data and evidence
             </p>
           </div>
         </div>

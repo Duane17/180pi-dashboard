@@ -10,7 +10,7 @@ interface ErrorStateProps {
 
 export function ErrorState({
   title = "Unable to load data",
-  description = "There was an error loading your ESG metrics. Please try again.",
+  description = "There was an error loading your sustainability metrics. Please try again.",
   onRetry,
   isRetrying = false,
 }: ErrorStateProps) {

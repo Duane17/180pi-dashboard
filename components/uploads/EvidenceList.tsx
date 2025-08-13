@@ -72,7 +72,7 @@ export function EvidenceList({
       <div className={className}>
         <EmptyState
           title="No evidence files found"
-          description="Upload evidence documents to support your ESG metrics and reporting."
+          description="Upload evidence documents to support your Sustainability Intelligence metrics and reporting."
           actionLabel="Upload Evidence"
           onAction={() => (window.location.href = "/upload/evidence")}
         />

@@ -20,9 +20,9 @@ export function Hero({
     <section className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white/15 via-white/10 to-white/5 p-8 backdrop-blur-sm border border-white/20 mb-12">
       <div className="relative z-10 text-center">
         {/* Logo */}
-        <div className="mb-6 flex justify-center">
+        <div className="mb-2 flex justify-center">
           <Image
-            src="/logo.svg"
+            src="/logo.webp"
             alt="180Pi Logo"
             width={160}
             height={48}
@@ -31,7 +31,12 @@ export function Hero({
           />
         </div>
 
-        {/* Heading — slightly smaller to give logo priority */}
+        {/* New tagline */}
+        <p className="mb-6 text-base font-medium text-[#4a4a4a]">
+          From Sustainability Reporting to Investment Intelligence
+        </p>
+
+        {/* Heading */}
         <h1 className="mb-6 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl bg-gradient-to-r from-[#8dcddb] via-[#3270a1] to-[#7e509c] bg-clip-text text-transparent">
           Your sustainability performance at a glance
         </h1>
@@ -63,7 +68,7 @@ export function Hero({
               <Gauge className="h-5 w-5 text-white" aria-hidden="true" />
             </div>
             <p className="text-base leading-relaxed text-[#4a4a4a]">
-              From automated ESG data collection to real-time performance insights, we help you see your true impact,
+              From automated sustainability data collection to real-time performance insights, we help you see your true impact,
               improve it, and connect with investors who value both returns and responsibility.
             </p>
           </div>

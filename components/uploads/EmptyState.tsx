@@ -14,7 +14,7 @@ interface EmptyStateProps {
 
 export function EmptyState({
   title = "No files uploaded yet",
-  description = "Upload evidence documents to support your ESG metrics and reporting.",
+  description = "Upload evidence documents to support your sustainability metrics and reporting.",
   actionLabel = "Upload Evidence",
   onAction,
   icon = "files",

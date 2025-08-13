@@ -260,16 +260,16 @@ export function StepReview({ data, onEdit, isSubmitting = false }: StepReviewPro
           <div>
             <h4 className="font-semibold text-[#1a1a1a] mb-2">Ready to Complete Setup</h4>
             <p className="text-[#4a4a4a] mb-4">
-              Once you submit this information, we'll create your personalized ESG reporting dashboard and begin
+              Once you submit this information, we'll create your personalized sustainability performance dashboard and begin
               analyzing your company's sustainability profile based on your industry, size, and locations.
             </p>
             <div className="text-sm text-[#4a4a4a]">
               <strong>Next steps after submission:</strong>
               <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Access your customized ESG dashboard</li>
+                <li>Access your customized Sustainability Intelligence Dashboard</li>
                 <li>Begin data collection for your first sustainability report</li>
                 <li>Explore climate impact simulations for your investment decisions</li>
-                <li>Connect with our ESG experts for personalized guidance</li>
+                <li>Connect with our sustainability experts for personalized guidance</li>
               </ul>
             </div>
           </div>

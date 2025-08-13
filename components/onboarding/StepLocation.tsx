@@ -436,9 +436,9 @@ export function StepLocation({ data, onChange, errors }: StepLocationProps) {
             <span className="text-white text-xs font-bold">✓</span>
           </div>
           <div>
-            <h4 className="font-medium text-green-900 mb-1">Location-Based ESG Insights</h4>
+            <h4 className="font-medium text-green-900 mb-1">Location-Based Sustainability Insights</h4>
             <p className="text-sm text-green-800">
-              By providing your locations, we can offer more accurate ESG reporting based on regional regulations,
+              By providing your locations, we can offer more accurate sustainability reporting based on regional regulations,
               climate risks, and sustainability standards specific to each area.
             </p>
           </div>

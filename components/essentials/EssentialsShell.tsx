@@ -20,7 +20,7 @@ export function EssentialsShell({ year, onYearChange, actionSlot, children }: Es
               <h1 className="text-2xl font-bold bg-gradient-to-r from-[#8dcddb] via-[#3270a1] to-[#7e509c] bg-clip-text text-transparent">
                 Essentials
               </h1>
-              <p className="text-[#4a4a4a] text-sm mt-1">Environmental and Labor baseline metrics for ESG reporting</p>
+              <p className="text-[#4a4a4a] text-sm mt-1">Environmental and Labor baseline metrics for sustainability reporting</p>
             </div>
             {actionSlot && <div className="flex items-center gap-3">{actionSlot}</div>}
           </div>

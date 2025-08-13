@@ -208,8 +208,8 @@ export function FiltersPanel({
         </div>
       </FilterGroup>
 
-      {/* ESG Preferences */}
-      <FilterGroup title="ESG Preferences" helper="Specify your ESG investment preferences and exclusions">
+      {/* Sustainability Preferences */}
+      <FilterGroup title="Sustainability Preferences" helper="Specify your sustainability investment preferences and exclusions">
         <div className="grid grid-cols-1 gap-2">
           {options.esgPrefs.map((pref) => (
             <div key={pref} className="flex items-center space-x-2">

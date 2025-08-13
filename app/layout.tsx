@@ -12,11 +12,11 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "180Pi - ESG Climate Intelligence",
-  description: "Bridge ESG data with meaningful climate action through investment simulation",
+  title: "180Pi - Sustainability Intelligence Platform",
+  description: "Bridge sustainability data with meaningful climate action through investment simulation",
   generator: "v0.dev",
   icons: {
-    icon: "/logo.svg", // Uses logo.svg from public/ as favicon
+    icon: "/logo.svg",
   },
 }
 

@@ -10,7 +10,7 @@ interface EmptyStateProps {
 
 export function EmptyState({
   title = "No data available",
-  description = "Add your first metrics to get started with ESG reporting",
+  description = "Add your first metrics to get started with sustainability reporting",
   actionLabel = "Add Metrics",
   onAction,
 }: EmptyStateProps) {

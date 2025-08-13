@@ -2,6 +2,9 @@
 import { Search, Bell } from "lucide-react"
 import { MobileSidebarToggle } from "./MobileSidebarToggle"
 import { UserMenu } from "@/components/profile/UserMenu"
+import { useState, useEffect, useMemo } from "react"
+import { useAuth } from "@/contexts/auth-context"
+import { useLogoutMutation } from "@/hooks/use-auth-mutations"
 
 interface TopbarProps {
   onMenuClick: () => void
@@ -19,6 +22,23 @@ interface TopbarProps {
 }
 
 export function Topbar({ onMenuClick, currentUser, onProfile, onSettings, onSwitchCompany, onSignOut }: TopbarProps) {
+  // ---- Auth: get the real logged-in user (no role handling) ----
+  const { user: authUser } = useAuth()
+  const logout = useLogoutMutation()
+  const shellUser = useMemo(
+    () =>
+      authUser
+        ? {
+            id: authUser.id,
+            name: authUser.name,
+            email: authUser.email,
+            role: "admin" as const,
+            // avatarUrl: authUser.avatarUrl, // uncomment if available in your UserSummary
+          }
+        : undefined,
+    [authUser]
+  )
+
   const mockUser = {
     id: "1",
     name: "Mahai Chairi",
@@ -27,15 +47,11 @@ export function Topbar({ onMenuClick, currentUser, onProfile, onSettings, onSwit
     avatarUrl: undefined,
   }
 
-  const user = currentUser || mockUser
+  const user = currentUser || shellUser || mockUser
 
   const handleSignOut = () => {
-    if (onSignOut) {
-      onSignOut()
-    } else {
-      // Mock sign out action
-      console.log("Sign out clicked")
-    }
+    if (onSignOut) return onSignOut()
+    logout.mutate()
   }
 
   return (
@@ -44,7 +60,7 @@ export function Topbar({ onMenuClick, currentUser, onProfile, onSettings, onSwit
         {/* Mobile menu button */}
         <MobileSidebarToggle onClick={onMenuClick} />
         {/* Search */}
-        <div className="flex-1 max-w-lg mx-auto">
+        {/* <div className="flex-1 max-w-lg mx-auto">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#4a4a4a]" aria-hidden="true" />
             <input
@@ -59,7 +75,7 @@ export function Topbar({ onMenuClick, currentUser, onProfile, onSettings, onSwit
               Search functionality is currently disabled
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Right side actions */}
         <div className="flex items-center gap-3 ml-auto pr-2">

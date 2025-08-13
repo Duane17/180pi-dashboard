@@ -2,7 +2,17 @@
 
 import { useState } from "react"
 import { usePathname } from "next/navigation"
-import { X, Handshake, Upload, FileText, Settings, Files, LayoutDashboard } from "lucide-react"
+import {
+  X,
+  Handshake,
+  Upload,
+  FileText,
+  Settings,
+  Files,
+  LayoutDashboard,
+  Gauge,
+  BookOpen,
+} from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
@@ -14,10 +24,12 @@ interface SidebarProps {
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Bridge", href: "/bridge", icon: Handshake },
-  { name: "Upload", href: "/upload/data", icon: Upload },      
-  { name: "Uploads", href: "/uploads", icon: Files },          
+  { name: "Upload", href: "/upload/data", icon: Upload },
   { name: "Reports", href: "/reports", icon: FileText },
+  { name: "Pathfinder", href: "#", icon: Gauge },
+  { name: "Bridge", href: "/bridge", icon: Handshake },
+  { name: "Library", href: "#", icon: BookOpen },
+  // { name: "Uploads", href: "/uploads", icon: Files },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -73,7 +85,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {/* Logo */}
           <div className="flex h-20 shrink-0 items-center gap-3">
             <Image
-              src="/logo.svg"
+              src="/logo.webp"
               alt="180Pi Logo"
               height={48}
               width={0}
@@ -89,7 +101,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {/* Footer */}
               <li className="mt-auto">
                 <div className="text-xs text-[#4a4a4a] border-t border-white/20 pt-4">
-                  <p>180Pi ESG Platform</p>
+                  <p>180Pi - Sustainability Intelligence Platform</p>
                   <p>Version 1.0.0</p>
                 </div>
               </li>
@@ -134,7 +146,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {/* Footer */}
               <li className="mt-auto">
                 <div className="text-xs text-[#4a4a4a] border-t border-white/20 pt-4">
-                  <p>180Pi ESG Platform</p>
+                  <p>180Pi - Sustainability Intelligence Platform</p>
                   <p>Version 1.0.0</p>
                 </div>
               </li>

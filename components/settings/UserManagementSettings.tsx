@@ -207,7 +207,7 @@ export function UserManagementSettings({
             <div className="text-center py-12 text-gray-500">
               <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No team members yet</h3>
-              <p className="text-sm">Invite colleagues to collaborate on ESG reporting</p>
+              <p className="text-sm">Invite colleagues to collaborate on sustainability reporting</p>
             </div>
           ) : (
             <div className="space-y-3">
