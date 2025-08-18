@@ -12,7 +12,7 @@ import { DEFAULT_ESG_VALUES } from "@/constants/esg.constants";
 
 // Validation (Zod)
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Resolver } from "react-hook-form";
+// IMPORTANT: use the correct filename (".schema") to avoid creating a second module instance
 import { ESGWizardSchema } from "@/schemas/esg-wizard-schema";
 
 // Hooks: dirty prompt + persist
@@ -25,6 +25,7 @@ import { useToast } from "@/components/ui/use-toast";
 // Steps
 import { GeneralStep } from "@/components/upload/steps/general-step";
 import { EnvironmentStep } from "@/components/upload/steps/environment-step";
+import { SocialStep } from "@/components/upload/steps/social-step"; // <- NEW
 
 // Extracted UI
 import WizardNav from "@/components/upload/wizard/wizard-nav";
@@ -50,8 +51,8 @@ export function ESGWizard({ onSubmit, initialValues }: ESGWizardProps) {
   const form = useForm<ESGWizardValues>({
     defaultValues,
     mode: "onChange",
-    resolver: zodResolver(ESGWizardSchema) as Resolver<ESGWizardValues>
-
+    // Remove the explicit Resolver import/cast; let zodResolver infer the types
+    resolver: zodResolver(ESGWizardSchema),
   });
 
   const { handleSubmit, getValues, formState, watch, reset } = form;
@@ -154,7 +155,7 @@ export function ESGWizard({ onSubmit, initialValues }: ESGWizardProps) {
         <div className="p-1">
           {current === 1 && <GeneralStep />}
           {current === 2 && <EnvironmentStep />}
-          {current === 3 && <StepPlaceholder title="Step 3 — Social" />}
+          {current === 3 && <SocialStep />} {/* ← mount the real Social step */}
           {current === 4 && <StepPlaceholder title="Step 4 — Governance" />}
         </div>
 

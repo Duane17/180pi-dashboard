@@ -194,16 +194,16 @@ export function defaultEnvironment(): EnvironmentValues {
 
 export function defaultSocial(): SocialValues {
   return {
-    laborStats: {
-      asOfDate: undefined,
-      fte: null,
-      femalePct: null,
-      femaleMgmtPct: null,
-      injuryRate: null,
-      trainingHoursPerEmployee: null,
-      genderPayGapPct: null,
-    },
-    policies: [],
+    laborStats: { },
+    workforceProfile: {},
+    nonEmployeeWorkers: {},
+    movement: {},
+    pay: {},
+    collectiveBargaining: {},
+    training: {},
+    ohs: {},
+    humanRights: {},
+    community: {},
   };
 }
 

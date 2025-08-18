@@ -393,9 +393,165 @@ export const SocialPolicySummarySchema = z.object({
 });
 
 export const SocialSchema = z.object({
-  laborStats: LaborStatsSchema,
-  policies: z.array(SocialPolicySummarySchema).optional(),
+  // keep existing laborStats + policies if needed
+  laborStats: LaborStatsSchema.optional(),
+
+  workforceProfile: z.object({
+    headcountByLocation: z.array(z.object({
+      country: z.string().min(1),
+      site: z.string().optional(),
+      headcount: nonNegDecimal(),
+    })).optional(),
+    contractType: z.object({
+      permanent: nonNegDecimal(),
+      temporary: nonNegDecimal(),
+    }).optional(),
+    employmentType: z.object({
+      fullTime: nonNegDecimal(),
+      partTime: nonNegDecimal(),
+    }).optional(),
+    gender: z.object({
+      women: nonNegDecimal(),
+      men: nonNegDecimal(),
+      undisclosed: nonNegDecimal(),
+    }).optional(),
+    ageBands: z.object({
+      under30: nonNegDecimal(),
+      from30to50: nonNegDecimal(),
+      over50: nonNegDecimal(),
+    }).optional(),
+    fteTotal: nonNegDecimal().optional(),
+  }).optional(),
+
+  nonEmployeeWorkers: z.object({
+    counts: z.object({
+      agency: nonNegDecimal(),
+      apprentices: nonNegDecimal(),
+      contractors: nonNegDecimal(),
+      homeWorkers: nonNegDecimal(),
+      internsVolunteers: nonNegDecimal(),
+      selfEmployed: nonNegDecimal(),
+    }).optional(),
+    hoursWorked: nonNegDecimal().optional(),
+  }).optional(),
+
+  movement: z.object({
+    headcountStart: nonNegDecimal().optional(),
+    headcountEnd: nonNegDecimal().optional(),
+    newHiresTotal: nonNegDecimal().optional(),
+    exitsTotal: nonNegDecimal().optional(),
+    newHiresBreakdown: z.object({
+      byGender: z.object({
+        women: nonNegDecimal().optional(),
+        men: nonNegDecimal().optional(),
+        undisclosed: nonNegDecimal().optional(),
+      }).optional(),
+      byAge: z.object({
+        under30: nonNegDecimal().optional(),
+        from30to50: nonNegDecimal().optional(),
+        over50: nonNegDecimal().optional(),
+      }).optional(),
+      byRegion: z.array(z.object({
+        region: z.string().min(1),
+        count: nonNegDecimal(),
+      })).optional(),
+    }).optional(),
+    exitsBreakdown: z.lazy(() => /* same shape as newHiresBreakdown */ z.object({
+      byGender: z.object({
+        women: nonNegDecimal().optional(),
+        men: nonNegDecimal().optional(),
+        undisclosed: nonNegDecimal().optional(),
+      }).optional(),
+      byAge: z.object({
+        under30: nonNegDecimal().optional(),
+        from30to50: nonNegDecimal().optional(),
+        over50: nonNegDecimal().optional(),
+      }).optional(),
+      byRegion: z.array(z.object({
+        region: z.string().min(1),
+        count: nonNegDecimal(),
+      })).optional(),
+    }).optional()),
+  }).optional(),
+
+  pay: z.object({
+    meetsMinimumWage: z.enum(["yes","no","mixed"]).optional(),
+    lowestHourlyRate: z.object({
+      amount: nonNegDecimal(),
+      currency: z.string().max(8),
+    }).optional(),
+    salaryByGroupAndLocation: z.array(z.object({
+      group: z.string().min(1),
+      country: z.string().min(1),
+      avgWomen: nonNegDecimal(),
+      avgMen: nonNegDecimal(),
+    })).optional(),
+  }).optional(),
+
+  collectiveBargaining: z.object({
+    coveredEmployees: nonNegDecimal().optional(),
+    totalEmployees: nonNegDecimal().optional(),
+  }).optional(),
+
+  training: z.object({
+    totalTrainingHours: nonNegDecimal().optional(),
+    employeesTrained: nonNegDecimal().optional(),
+    byGender: z.object({
+      women: nonNegDecimal().optional(),
+      men: nonNegDecimal().optional(),
+      undisclosed: nonNegDecimal().optional(),
+    }).optional(),
+    byGroup: z.array(z.object({
+      group: z.string().min(1),
+      hours: nonNegDecimal(),
+    })).optional(),
+  }).optional(),
+
+  ohs: z.object({
+    employees: z.object({
+      hoursWorked: nonNegDecimal().optional(),
+      recordableInjuries: nonNegDecimal().optional(),
+      highConsequenceInjuries: nonNegDecimal().optional(),
+      fatalities: nonNegDecimal().optional(),
+    }).optional(),
+    nonEmployees: z.object({
+      hoursWorked: nonNegDecimal().optional(),
+      recordableInjuries: nonNegDecimal().optional(),
+      highConsequenceInjuries: nonNegDecimal().optional(),
+      fatalities: nonNegDecimal().optional(),
+    }).optional(),
+  }).optional(),
+
+  humanRights: z.object({
+    policyExists: z.enum(["yes","no"]).nullable().optional(),
+    policyCovers: z.object({
+      childLabour: z.boolean().optional(),
+      forcedLabour: z.boolean().optional(),
+      humanTrafficking: z.boolean().optional(),
+      discrimination: z.boolean().optional(),
+      healthAndSafety: z.boolean().optional(),
+      other: z.boolean().optional(),
+      otherText: z.string().max(200).optional(),
+    }).optional()
+      .refine(v => !v?.other || !!v?.otherText?.trim(), { path:["otherText"], message:"Specify topic" }),
+    grievanceMechanism: z.enum(["yes","no"]).nullable().optional(),
+    incidents: z.array(z.object({
+      topic: z.enum(["childLabour","forcedLabour","humanTrafficking","discrimination","healthAndSafety","other"]),
+      confirmed: z.enum(["yes","no"]),
+      description: z.string().max(500).nullable().optional(),
+    })).optional(),
+  }).optional(),
+
+  community: z.object({
+    volunteerHours: nonNegDecimal().optional(),
+    cashDonations: z.object({ amount: nonNegDecimal(), currency: z.string().max(8) }).optional(),
+    inKindDonations: z.object({ amount: nonNegDecimal(), currency: z.string().max(8) }).optional(),
+    estimatedBeneficiaries: nonNegDecimal().optional(),
+    sitesWithAssessment: nonNegDecimal().optional(),
+    totalSites: nonNegDecimal().optional(),
+  }).optional(),
 });
+
 
 /** --------------------- Governance --------------------- */
 export const BoardMemberSchema = z.object({
