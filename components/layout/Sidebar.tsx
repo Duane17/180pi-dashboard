@@ -23,14 +23,14 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  // { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Upload", href: "/upload/data", icon: Upload },
-  { name: "Reports", href: "/reports", icon: FileText },
-  { name: "Pathfinder", href: "#", icon: Gauge },
-  { name: "Bridge", href: "/bridge", icon: Handshake },
-  { name: "Library", href: "#", icon: BookOpen },
+  // { name: "Reports", href: "/reports", icon: FileText },
+  // { name: "Pathfinder", href: "#", icon: Gauge },
+  // { name: "Bridge", href: "/bridge", icon: Handshake },
+  // { name: "Library", href: "#", icon: BookOpen },
   // { name: "Uploads", href: "/uploads", icon: Files },
-  { name: "Settings", href: "/settings", icon: Settings },
+  // { name: "Settings", href: "/settings", icon: Settings },
 ]
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
