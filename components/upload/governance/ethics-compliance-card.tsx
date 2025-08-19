@@ -1,0 +1,413 @@
+"use client";
+
+import { useMemo } from "react";
+import {
+  SectionHeader,
+  NumberField,
+  TextField,
+  SelectField,
+  Divider,
+} from "@/components/upload/env/ui";
+import { Chip } from "../social/ui/chip";
+
+/* ============================== Types ============================== */
+
+export type YesNo = "yes" | "no";
+
+export type PolicyEntry = {
+  exists: boolean;
+  date?: string; // ISO (optional)
+  url?: string;  // optional
+};
+
+export type PoliciesBlock = {
+  codeOfConduct: PolicyEntry;
+  antiCorruption: PolicyEntry;
+  conflictOfInterest: PolicyEntry;
+  whistleblowing: PolicyEntry;
+  relatedParty: PolicyEntry;
+  giftsHospitality: PolicyEntry;
+  dataPrivacy: PolicyEntry;
+};
+
+export type TrainingCoverage = {
+  codeOfConductPct?: number | null;
+  antiCorruptionPct?: number | null;
+};
+
+export type IncidentsBlock = {
+  corruption?: number | null;
+  fraud?: number | null;
+  dataPrivacy?: number | null;
+  other?: number | null;
+  otherText?: string;
+};
+
+export type PenaltiesBlock = {
+  finesAmount?: number | null;
+  finesCurrency?: string;
+  nonMonetaryCount?: number | null;
+};
+
+export type PoliticalContributions = {
+  none: boolean;
+  amount?: number | null;
+  currency?: string;
+};
+
+export type EthicsComplianceValue = {
+  policies: PoliciesBlock;
+  trainingCoverage?: TrainingCoverage;
+  whistleblowingChannel: YesNo;
+  incidents?: IncidentsBlock;
+  penalties?: PenaltiesBlock;
+  politicalContributions?: PoliticalContributions;
+};
+
+type Props = {
+  value: EthicsComplianceValue;
+  onChange: (patch: Partial<EthicsComplianceValue>) => void;
+  readOnly?: boolean;
+};
+
+/* ============================== Helpers ============================== */
+
+const YES_NO: readonly YesNo[] = ["yes", "no"];
+
+function toNum(n: unknown) {
+  const v = typeof n === "number" ? n : Number(n);
+  return Number.isFinite(v) ? v : 0;
+}
+function fmtPct(n: number | null | undefined) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  return `${n.toFixed(1)}%`;
+}
+function fmtMoney(n: number | null | undefined, cur?: string) {
+  if (n == null || !Number.isFinite(n)) return "—";
+  const s = n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return cur?.trim() ? `${s} ${cur.trim()}` : s;
+}
+
+/* ============================== Component ============================== */
+
+export function EthicsComplianceCard({ value, onChange, readOnly }: Props) {
+  const policies = value.policies;
+  const training = value.trainingCoverage ?? {};
+  const incidents = value.incidents ?? {};
+  const penalties = value.penalties ?? {};
+  const contrib = value.politicalContributions ?? { none: false };
+
+  // ---------- Derived ----------
+  const policyCoverageScore = useMemo(() => {
+    const entries: PolicyEntry[] = [
+      policies.codeOfConduct,
+      policies.antiCorruption,
+      policies.conflictOfInterest,
+      policies.whistleblowing,
+      policies.relatedParty,
+      policies.giftsHospitality,
+      policies.dataPrivacy,
+    ];
+    const present = entries.filter((p) => !!p?.exists).length;
+    return { present, total: 7, percent: (present / 7) * 100 };
+  }, [policies]);
+
+  const totalIncidents = useMemo(() => {
+    const c = toNum(incidents.corruption);
+    const f = toNum(incidents.fraud);
+    const d = toNum(incidents.dataPrivacy);
+    const o = toNum(incidents.other);
+    return { byType: { corruption: c, fraud: f, dataPrivacy: d, other: o }, overall: c + f + d + o };
+  }, [incidents.corruption, incidents.fraud, incidents.dataPrivacy, incidents.other]);
+
+  const sanctionsCount = useMemo(() => {
+    const nonMonetary = toNum(penalties.nonMonetaryCount);
+    const fines = toNum(penalties.finesAmount);
+    // count 1 if fines > 0 (you can show the amount separately)
+    return nonMonetary + (fines > 0 ? 1 : 0);
+  }, [penalties.nonMonetaryCount, penalties.finesAmount]);
+
+  // ---------- Patchers ----------
+  const patchPolicies = (key: keyof PoliciesBlock, patch: Partial<PolicyEntry>) => {
+    onChange({
+      policies: {
+        ...policies,
+        [key]: { ...policies[key], ...patch },
+      } as PoliciesBlock,
+    });
+  };
+
+  const patchTraining = (p: Partial<TrainingCoverage>) =>
+    onChange({ trainingCoverage: { ...training, ...p } });
+
+  const patchIncidents = (p: Partial<IncidentsBlock>) =>
+    onChange({ incidents: { ...incidents, ...p } });
+
+  const patchPenalties = (p: Partial<PenaltiesBlock>) =>
+    onChange({ penalties: { ...penalties, ...p } });
+
+  const patchContrib = (p: Partial<PoliticalContributions>) => {
+    // If toggling none -> true, force amount null
+    const next = { ...contrib, ...p };
+    if (p.none === true) {
+      next.amount = null;
+      // currency can remain for display, but you may clear it if desired.
+    }
+    onChange({ politicalContributions: next });
+  };
+
+  // Helpers for policy rows
+  const PolicyRow = ({
+    label,
+    k,
+  }: {
+    label: string;
+    k:
+      | "codeOfConduct"
+      | "antiCorruption"
+      | "conflictOfInterest"
+      | "whistleblowing"
+      | "relatedParty"
+      | "giftsHospitality"
+      | "dataPrivacy";
+  }) => {
+    const row = policies[k] ?? { exists: false };
+    return (
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+        <label className="inline-flex items-center gap-2 text-sm text-gray-800">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={!!row.exists}
+            onChange={(e) => patchPolicies(k, { exists: e.target.checked })}
+            disabled={readOnly}
+          />
+          {label}
+        </label>
+        <TextField
+          label="Date (ISO)"
+          value={row.date ?? ""}
+          onChange={(v) => patchPolicies(k, { date: v ?? "" })}
+          placeholder="YYYY-MM-DD"
+        />
+        <div className="sm:col-span-2">
+          <TextField
+            label="URL (optional)"
+            value={row.url ?? ""}
+            onChange={(v) => patchPolicies(k, { url: v ?? "" })}
+            placeholder="https://…"
+          />
+        </div>
+      </div>
+    );
+  };
+
+  // Training coverage hints
+  const pctHint = "Enter 0–100 (optional)";
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h3 className="bg-gradient-to-r from-[#3270a1] via-[#7e509c] to-[#8dcddb] bg-clip-text text-lg font-semibold text-transparent">
+          Ethics & Compliance
+        </h3>
+        <p className="mt-1 text-sm text-gray-700">
+          Capture policy coverage, training, incidents, penalties and political contributions.
+        </p>
+      </div>
+
+      {/* Policies matrix */}
+      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <SectionHeader title="Policies" />
+        <div className="mt-3 space-y-3">
+          <PolicyRow label="Code of Conduct"       k="codeOfConduct" />
+          <PolicyRow label="Anti-corruption & Bribery" k="antiCorruption" />
+          <PolicyRow label="Conflict of Interest"   k="conflictOfInterest" />
+          <PolicyRow label="Whistleblowing"         k="whistleblowing" />
+          <PolicyRow label="Related-Party Transactions" k="relatedParty" />
+          <PolicyRow label="Gifts & Hospitality"    k="giftsHospitality" />
+          <PolicyRow label="Data Privacy"           k="dataPrivacy" />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip
+              label="Policy coverage"
+              value={`${policyCoverageScore.present}/${policyCoverageScore.total} (${fmtPct(
+                policyCoverageScore.percent
+              )})`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Training coverage */}
+      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <SectionHeader title="Training coverage (optional)" />
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-2">
+          <NumberField
+            label="Code of Conduct trained (%)"
+            value={training.codeOfConductPct ?? ""}
+            min={0}
+            onChange={(n) => {
+              const v = n == null ? null : Math.max(0, Math.min(100, n));
+              patchTraining({ codeOfConductPct: v });
+            }}
+            hint={pctHint}
+          />
+          <NumberField
+            label="Anti-corruption trained (%)"
+            value={training.antiCorruptionPct ?? ""}
+            min={0}
+            onChange={(n) => {
+              const v = n == null ? null : Math.max(0, Math.min(100, n));
+              patchTraining({ antiCorruptionPct: v });
+            }}
+            hint={pctHint}
+          />
+        </div>
+      </div>
+
+      {/* Whistleblowing channel */}
+      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <SectionHeader title="Whistleblowing channel" />
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:max-w-xs">
+          <SelectField
+            label="Channel in place?"
+            value={value.whistleblowingChannel}
+            options={YES_NO as unknown as readonly string[]}
+            onChange={(v) =>
+              onChange({ whistleblowingChannel: (v as YesNo) || "no" })
+            }
+          />
+        </div>
+      </div>
+
+      {/* Incidents */}
+      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <SectionHeader title="Incidents this period" />
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <NumberField
+            label="Corruption"
+            value={incidents.corruption ?? ""}
+            min={0}
+            onChange={(n) => patchIncidents({ corruption: n ?? null })}
+          />
+          <NumberField
+            label="Fraud"
+            value={incidents.fraud ?? ""}
+            min={0}
+            onChange={(n) => patchIncidents({ fraud: n ?? null })}
+          />
+          <NumberField
+            label="Data privacy"
+            value={incidents.dataPrivacy ?? ""}
+            min={0}
+            onChange={(n) => patchIncidents({ dataPrivacy: n ?? null })}
+          />
+          <NumberField
+            label="Other (count)"
+            value={incidents.other ?? ""}
+            min={0}
+            onChange={(n) => patchIncidents({ other: n ?? null })}
+          />
+        </div>
+        <div className="mt-3 grid grid-cols-1 sm:max-w-2xl">
+          <TextField
+            label="Other (short description)"
+            value={incidents.otherText ?? ""}
+            onChange={(v) => patchIncidents({ otherText: v ?? "" })}
+            placeholder="e.g., harassment, theft, etc."
+          />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip label="Total incidents" value={`${totalIncidents.overall}`} />
+            <Chip label="Corruption" value={`${totalIncidents.byType.corruption}`} />
+            <Chip label="Fraud" value={`${totalIncidents.byType.fraud}`} />
+            <Chip label="Data privacy" value={`${totalIncidents.byType.dataPrivacy}`} />
+            <Chip label="Other" value={`${totalIncidents.byType.other}`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Penalties & sanctions */}
+      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <SectionHeader title="Fines & sanctions" />
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <NumberField
+            label="Fines (amount)"
+            value={penalties.finesAmount ?? ""}
+            min={0}
+            onChange={(n) => patchPenalties({ finesAmount: n ?? null })}
+          />
+          <TextField
+            label="Currency"
+            value={penalties.finesCurrency ?? ""}
+            onChange={(v) => patchPenalties({ finesCurrency: v ?? "" })}
+            placeholder="ISO code or symbol"
+          />
+          <NumberField
+            label="Non-monetary sanctions (count)"
+            value={penalties.nonMonetaryCount ?? ""}
+            min={0}
+            onChange={(n) => patchPenalties({ nonMonetaryCount: n ?? null })}
+          />
+        </div>
+
+        <div className="mt-4 rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip
+              label="Fines"
+              value={fmtMoney(penalties.finesAmount ?? null, penalties.finesCurrency)}
+            />
+            <Chip label="Sanctions count" value={`${sanctionsCount}`} />
+          </div>
+        </div>
+      </div>
+
+      {/* Political contributions */}
+      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <SectionHeader title="Political contributions" />
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 text-sm text-gray-800">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={!!contrib.none}
+              onChange={(e) => patchContrib({ none: e.target.checked })}
+              disabled={readOnly}
+            />
+            None
+          </label>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-2">
+          <NumberField
+            label="Amount"
+            value={contrib.none ? "" : contrib.amount ?? ""}
+            min={0}
+            onChange={(n) => patchContrib({ amount: contrib.none ? null : n ?? null })}
+          />
+          <TextField
+            label="Currency"
+            value={contrib.currency ?? ""}
+            onChange={(v) => patchContrib({ currency: v ?? "" })}
+            placeholder="ISO code or symbol"
+          />
+        </div>
+      </div>
+
+      <Divider />
+      <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <span className="text-gray-700">
+          <u>Validation</u>: If “None” is ticked for political contributions, the amount is
+          forced to null. Training coverage (if set) is clamped to 0–100. Counts and amounts
+          must be non-negative.
+        </span>
+      </div>
+    </div>
+  );
+}

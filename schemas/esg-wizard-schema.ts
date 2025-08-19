@@ -586,11 +586,530 @@ export const ComplianceStatusEntrySchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+/** ───────────────────────────── Governance: Extensions ─────────────────────────────
+ * Requires: coerceDecimal, nonNegDecimal, BoardMemberSchema, GovernancePolicySchema,
+ *           ComplianceStatusEntrySchema already defined above in this file.
+ */
+
+/* ========== (1) Ownership & Legal Structure ========== */
+
+const ShareholderRowSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, "Shareholder name is required"),
+  pct: nonNegDecimal("Invalid %"), // allow null if blank; UI should enforce presence
+});
+
+const ShareClassEntrySchema = z.object({
+  name: z.string().min(1, "Class name is required"),
+  votingRightsPerShare: nonNegDecimal().nullable().optional(),
+  notes: z.string().max(500).optional(),
+});
+
+const ShareClassesSchema = z
+  .object({
+    structure: z.enum(["ordinary", "dual_class"]),
+    classes: z.array(ShareClassEntrySchema).optional(),
+    dualClassNotes: z.string().max(500).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.structure === "dual_class" && !v.dualClassNotes?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please describe voting differences for dual-class shares.",
+        path: ["dualClassNotes"],
+      });
+    }
+  });
+
+const GovernanceOwnershipSchema = z
+  .object({
+    ultimateParent: z.object({
+      name: z.string().min(1, "Required"),
+      status: z.enum(["named", "independent"]).default("named"),
+    }),
+    topShareholders: z.array(ShareholderRowSchema).default([]),
+    isListedEquity: z.boolean().default(false),
+    shareClasses: ShareClassesSchema.optional(),
+    controlFeatures: z
+      .object({
+        hasControlFeatures: z.boolean(),
+        description: z.string().max(1000).optional(),
+      })
+      .optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.isListedEquity) {
+      const sum =
+        (v.topShareholders ?? []).reduce(
+          (acc, r) => acc + (Number(r.pct ?? 0) || 0),
+          0
+        ) || 0;
+      if (sum > 100.000001) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Sum of shareholder percentages must not exceed 100% for listed equity.",
+          path: ["topShareholders"],
+        });
+      }
+    }
+  });
+
+/* ========== (2) Governance Body & Composition ========== */
+
+const DirectorRoleEnum = z.enum([
+  "chair",
+  "member",
+  "vice_chair",
+  "executive",
+  "non_executive",
+]);
+
+const DirectorGenderEnum = z.enum(["woman", "man", "undisclosed"]);
+const DirectorAgeBandEnum = z.enum(["<30", "30–50", ">50"]);
+const CommitteeKeyEnum = z.enum(["audit", "remuneration", "nomination", "esg"]);
+
+const DirectorSchema = z.object({
+  id: z.string().optional(), // optional but recommended for linking
+  fullName: z.string().min(1, "Required"),
+  role: DirectorRoleEnum,
+  independence: z.enum(["independent", "non-independent"]),
+  gender: DirectorGenderEnum.optional(),
+  ageBand: DirectorAgeBandEnum.optional(),
+  nationality: z.string().optional(),
+  tenureYears: nonNegDecimal().nullable().optional(),
+  appointedAt: z.string().date("Invalid date").optional(),
+  committees: z.array(CommitteeKeyEnum).optional(),
+  meetingsHeld: nonNegDecimal().nullable().optional(),
+  meetingsAttended: nonNegDecimal().nullable().optional(),
+});
+
+const BoardEvaluationSchema = z
+  .object({
+    conducted: z.enum(["yes", "no"]).default("no"),
+    type: z.enum(["internal", "external"]).optional(),
+    date: z.string().date("Invalid date").optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.conducted === "yes") {
+      if (!v.type) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Specify whether evaluation was internal or external.",
+          path: ["type"],
+        });
+      }
+      if (!v.date) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Provide the evaluation date.",
+          path: ["date"],
+        });
+      }
+    }
+  });
+
+const GovernanceBodySchema = z
+  .object({
+    highestBodyName: z.string().min(1, "Required").optional(),
+    chairCeoRoles: z.enum(["separate", "combined"]).optional(),
+    directors: z.array(DirectorSchema).default([]),
+    meetingsHeldTotal: nonNegDecimal().nullable().optional(),
+    boardEvaluation: BoardEvaluationSchema.optional(),
+  })
+  .superRefine((v, ctx) => {
+    v.directors.forEach((d, idx) => {
+      const held =
+        d.meetingsHeld != null
+          ? Number(d.meetingsHeld)
+          : v.meetingsHeldTotal != null
+          ? Number(v.meetingsHeldTotal)
+          : null;
+      const attended =
+        d.meetingsAttended != null ? Number(d.meetingsAttended) : null;
+      if (held != null && attended != null && attended > held) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Attendance cannot exceed meetings held.",
+          path: ["directors", idx, "meetingsAttended"],
+        });
+      }
+    });
+  });
+
+/* ========== (3) Oversight of Sustainability (GRI 2-12 & 2-14) ========== */
+
+const GovernanceOversightSchema = z.object({
+  oversightBody: z.enum(["board", "committee", "senior_executive"]).optional(),
+  namesRoles: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        role: z.string().min(1),
+      })
+    )
+    .optional(),
+  briefingFrequency: z
+    .enum(["every_meeting", "quarterly", "annually", "ad_hoc"])
+    .optional(),
+  reportApproval: z
+    .object({
+      approver: z.enum(["board", "committee", "executive"]).optional(),
+      approved: z.enum(["yes", "no"]).optional(),
+    })
+    .optional(),
+  assurance: z
+    .object({
+      level: z.enum(["none", "limited", "reasonable"]).default("none"),
+      providerName: z.string().optional(),
+    })
+    .optional(),
+});
+
+/* ========== (4) Committees (Audit / Remuneration / Nomination / ESG) ========== */
+
+const CommitteeAttendanceRowSchema = z.object({
+  directorId: z.string().min(1),
+  attended: nonNegDecimal(),
+  held: nonNegDecimal().nullable().optional(), // falls back to committee.meetingsHeld
+});
+
+const SingleCommitteeSchema = z
+  .object({
+    exists: z.boolean(),
+    chairId: z.string().optional(),
+    memberIds: z.array(z.string()).default([]).optional(),
+    independenceMajority: z.enum(["yes", "no"]).nullable().optional(),
+    meetingsHeld: nonNegDecimal().nullable().optional(),
+    responsibilities: z.string().max(1000).optional(),
+    attendance: z.array(CommitteeAttendanceRowSchema).optional(),
+  })
+  .superRefine((c, ctx) => {
+    (c.attendance ?? []).forEach((row, i) => {
+      const held =
+        row.held != null
+          ? Number(row.held)
+          : c.meetingsHeld != null
+          ? Number(c.meetingsHeld)
+          : null;
+      const attended = row.attended != null ? Number(row.attended) : null;
+      if (held != null && attended != null && attended > held) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Attendance cannot exceed meetings held.",
+          path: ["attendance", i, "attended"],
+        });
+      }
+    });
+  });
+
+const GovernanceCommitteesSchema = z.object({
+  audit: SingleCommitteeSchema,
+  remuneration: SingleCommitteeSchema,
+  nomination: SingleCommitteeSchema,
+  esg: SingleCommitteeSchema,
+});
+
+/* ========== (5) Executive Remuneration ========== */
+
+const LinkOrUploadSchema = z.object({
+  url: z.string().url().optional(),
+  uploadId: z.string().optional(),
+});
+
+const ESGMetricSchema = z.object({
+  name: z.string().min(1),
+  weightPct: nonNegDecimal(), // UI can warn if sum > 100; not hard-blocked
+});
+
+const MoneySchema = z.object({
+  amount: nonNegDecimal().nullable().optional(),
+  currency: z.string().max(8).optional(),
+});
+
+const GovernanceRemunerationSchema = z
+  .object({
+    policy: LinkOrUploadSchema.optional(),
+    payElements: z
+      .object({
+        fixed: z.boolean().optional(),
+        annualBonus: z.boolean().optional(),
+        lti: z.boolean().optional(),
+      })
+      .optional(),
+    esgLinked: z.enum(["yes", "no"]).optional(),
+    esgMetrics: z.array(ESGMetricSchema).optional(),
+    ceoPay: MoneySchema.optional(),
+    medianEmployeePay: MoneySchema.optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.esgLinked === "yes" && (!v.esgMetrics || v.esgMetrics.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Add at least one ESG metric and weight when ESG is linked to pay.",
+        path: ["esgMetrics"],
+      });
+    }
+  });
+
+/* ========== (6) Ethics & Compliance ========== */
+
+const PolicyPresenceSchema = z.object({
+  exists: z.boolean(),
+  date: z.string().date("Invalid date").optional(),
+  url: z.string().url().optional(),
+});
+
+const TrainingCoverageSchema = z
+  .object({
+    codeOfConductPct: nonNegDecimal().nullable().optional(),
+    antiCorruptionPct: nonNegDecimal().nullable().optional(),
+  })
+  .superRefine((v, ctx) => {
+    (["codeOfConductPct", "antiCorruptionPct"] as const).forEach((k) => {
+      const val = v[k];
+      if (val != null && (Number(val) < 0 || Number(val) > 100)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Coverage must be between 0 and 100.",
+          path: [k],
+        });
+      }
+    });
+  });
+
+const EthicsIncidentsSchema = z.object({
+  corruption: nonNegDecimal().nullable().optional(),
+  fraud: nonNegDecimal().nullable().optional(),
+  dataPrivacy: nonNegDecimal().nullable().optional(),
+  other: nonNegDecimal().nullable().optional(),
+  otherText: z.string().max(300).optional(),
+});
+
+const PenaltiesSchema = z.object({
+  finesAmount: nonNegDecimal().nullable().optional(),
+  finesCurrency: z.string().max(8).optional(),
+  nonMonetaryCount: nonNegDecimal().nullable().optional(),
+});
+
+const PoliticalContributionsSchema = z
+  .object({
+    none: z.boolean().default(false),
+    amount: nonNegDecimal().nullable().optional(),
+    currency: z.string().max(8).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.none && v.amount != null && Number(v.amount) > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Amount must be empty when 'None' is selected.",
+        path: ["amount"],
+      });
+    }
+    if (!v.none && v.amount != null && !v.currency?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide currency for political contributions.",
+        path: ["currency"],
+      });
+    }
+  });
+
+const GovernanceEthicsSchema = z.object({
+  policies: z.object({
+    codeOfConduct: PolicyPresenceSchema,
+    antiCorruption: PolicyPresenceSchema,
+    conflictOfInterest: PolicyPresenceSchema,
+    whistleblowing: PolicyPresenceSchema,
+    relatedParty: PolicyPresenceSchema,
+    giftsHospitality: PolicyPresenceSchema,
+    dataPrivacy: PolicyPresenceSchema,
+  }),
+  trainingCoverage: TrainingCoverageSchema.optional(),
+  whistleblowingChannel: z.enum(["yes", "no"]).optional(),
+  incidents: EthicsIncidentsSchema.optional(),
+  penalties: PenaltiesSchema.optional(),
+  politicalContributions: PoliticalContributionsSchema.optional(),
+});
+
+/* ========== (7) Related-Party Transactions (RPT) ========== */
+
+const RptRowSchema = z
+  .object({
+    id: z.string().optional(),
+    counterparty: z.string().min(1),
+    relationship: z.enum([
+      "shareholder",
+      "director_related",
+      "affiliate",
+      "key_management",
+      "other",
+    ]),
+    amount: z.object({
+      value: nonNegDecimal().nullable().optional(),
+      currency: z.string().max(8).optional(),
+    }),
+    nature: z.enum(["goods", "services", "loan", "lease", "other"]),
+    armsLength: z.enum(["yes", "no"]),
+    independentApproval: z.enum(["yes", "no"]),
+    notes: z.string().max(500).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.amount.value != null && !v.amount.currency?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Provide currency when an amount is entered.",
+        path: ["amount", "currency"],
+      });
+    }
+  });
+
+const GovernanceRPTSchema = z.array(RptRowSchema).default([]);
+
+/* ========== (8) Auditor & Controls ========== */
+
+const ExternalAuditorSchema = z.object({
+  name: z.string().min(1),
+  initialYear: z.coerce.number().int().min(1900).max(3000).nullable().optional(),
+  latestRotationYear: z
+    .coerce.number()
+    .int()
+    .min(1900)
+    .max(3000)
+    .nullable()
+    .optional(),
+});
+
+const CriticalConcernsSchema = z.object({
+  mechanism: z.enum(["yes", "no"]),
+  raised: nonNegDecimal().nullable().optional(),
+  resolved: nonNegDecimal().nullable().optional(),
+});
+
+const AuditFeesSchema = z.object({
+  total: nonNegDecimal().nullable().optional(),
+  nonAudit: nonNegDecimal().nullable().optional(),
+  currency: z.string().max(8).optional(),
+});
+
+const GovernanceAuditSchema = z
+  .object({
+    externalAuditor: ExternalAuditorSchema.optional(),
+    internalAuditFunction: z.enum(["yes", "no"]).optional(),
+    criticalConcerns: CriticalConcernsSchema.optional(),
+    fees: AuditFeesSchema.optional(),
+  })
+  .superRefine((v, ctx) => {
+    // Year ordering
+    const a = v.externalAuditor;
+    if (
+      a?.initialYear != null &&
+      a?.latestRotationYear != null &&
+      Number(a.latestRotationYear) < Number(a.initialYear)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Latest rotation year cannot precede initial appointment year.",
+        path: ["externalAuditor", "latestRotationYear"],
+      });
+    }
+    // Fee ratio sanity
+    if (
+      v.fees?.total != null &&
+      v.fees?.nonAudit != null &&
+      Number(v.fees.nonAudit) > Number(v.fees.total)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Non-audit fees cannot exceed total fees.",
+        path: ["fees", "nonAudit"],
+      });
+    }
+  });
+
+/* ========== (9) Materiality & Stakeholder Engagement ========== */
+
+const StakeholderEnum = z.enum([
+  "employees",
+  "customers",
+  "suppliers",
+  "communities",
+  "investors",
+  "regulators",
+  "other",
+]);
+
+const GovernanceMaterialitySchema = z
+  .object({
+    assessment: z
+      .object({
+        done: z.enum(["yes", "no", "planned"]).default("no"),
+        method: z.string().max(500).optional(),
+        date: z.string().date("Invalid date").optional(),
+      })
+      .optional(),
+    stakeholderGroups: z.array(StakeholderEnum).default([]),
+    otherStakeholderText: z.string().max(200).optional(),
+    topMaterialTopics: z.array(z.string().min(1)).default([]),
+    criticalConcernsComms: z
+      .object({
+        how: z.string().max(500),
+        frequency: z.string().max(200),
+        countToBoard: nonNegDecimal().nullable().optional(),
+      })
+      .optional(),
+  })
+  .superRefine((v, ctx) => {
+    if ((v.stakeholderGroups ?? []).includes("other") && !v.otherStakeholderText?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Specify the 'Other' stakeholder group.",
+        path: ["otherStakeholderText"],
+      });
+    }
+  });
+
+/* ========== (10) Transparency & Reporting ========== */
+
+const GovernanceReportingSchema = z.object({
+  publications: z
+    .object({
+      annualReport: LinkOrUploadSchema.optional(),
+      financialStatements: LinkOrUploadSchema.optional(),
+      sustainabilityReport: LinkOrUploadSchema.optional(),
+    })
+    .optional(),
+  assuranceStatement: LinkOrUploadSchema.optional(),
+  index: z
+    .object({
+      gri: LinkOrUploadSchema.optional(),
+      vsme: LinkOrUploadSchema.optional(),
+    })
+    .optional(),
+});
+
+/* ========== Compose: Replace previous GovernanceSchema export with this ========== */
+
 export const GovernanceSchema = z.object({
+  // ── Backward-compat fields (keep to avoid breaking older forms)
   boardMembers: z.array(BoardMemberSchema),
   policies: z.array(GovernancePolicySchema).optional(),
   complianceStatus: z.array(ComplianceStatusEntrySchema).optional(),
+
+  // ── New slices
+  ownership: GovernanceOwnershipSchema.optional(),
+  body: GovernanceBodySchema.optional(),
+  oversight: GovernanceOversightSchema.optional(),
+  committees: GovernanceCommitteesSchema.optional(),
+  remuneration: GovernanceRemunerationSchema.optional(),
+  ethics: GovernanceEthicsSchema.optional(),
+  rpt: GovernanceRPTSchema.optional(),
+  audit: GovernanceAuditSchema.optional(),
+  materiality: GovernanceMaterialitySchema.optional(),
+  reporting: GovernanceReportingSchema.optional(),
 });
+
+
+
 
 /** ------------------ Composed Wizard ------------------- */
 export const ESGWizardSchema = z.object({
@@ -639,6 +1158,11 @@ export const fieldPathsByStep: Record<1 | 2 | 3 | 4, string[]> = {
     "social.laborStats.femaleMgmtPct",
   ],
   4: [
-    "governance.boardMembers", // validating the array is sufficient for RHF
+    "governance.boardMembers",
+    "governance.ownership", 
+    "governance.body.directors", 
+    "governance.committees.audit", 
+    "governance.remuneration", 
+    "governance.ethics.policies", 
   ],
 } as const;

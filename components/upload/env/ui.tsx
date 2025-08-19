@@ -139,13 +139,15 @@ export function SelectField<T extends string>({
   value,
   options,
   onChange,
-  allowEmpty = false,
+  allowEmpty = true,             
+  placeholderText = "Select…",   
 }: {
   label: string;
   value: string | undefined;
   options: readonly T[];
   onChange: (v: string | undefined) => void;
   allowEmpty?: boolean;
+  placeholderText?: string;
 }) {
   return (
     <div>
@@ -155,7 +157,15 @@ export function SelectField<T extends string>({
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || undefined)}
       >
-        {allowEmpty && <option value="">Select…</option>}
+        {/* Always render placeholder first so the first real option is never auto-selected */}
+        <option
+          value=""
+          disabled={!allowEmpty}     // if not clearable, placeholder is disabled but still shown first
+          hidden={false}             // keep visible even when disabled
+        >
+          {placeholderText}
+        </option>
+
         {options.map((o) => (
           <option key={o} value={o}>
             {o}
@@ -165,3 +175,4 @@ export function SelectField<T extends string>({
     </div>
   );
 }
+

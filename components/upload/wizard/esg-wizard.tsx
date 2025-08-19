@@ -12,7 +12,6 @@ import { DEFAULT_ESG_VALUES } from "@/constants/esg.constants";
 
 // Validation (Zod)
 import { zodResolver } from "@hookform/resolvers/zod";
-// IMPORTANT: use the correct filename (".schema") to avoid creating a second module instance
 import { ESGWizardSchema } from "@/schemas/esg-wizard-schema";
 
 // Hooks: dirty prompt + persist
@@ -25,7 +24,8 @@ import { useToast } from "@/components/ui/use-toast";
 // Steps
 import { GeneralStep } from "@/components/upload/steps/general-step";
 import { EnvironmentStep } from "@/components/upload/steps/environment-step";
-import { SocialStep } from "@/components/upload/steps/social-step"; // <- NEW
+import { SocialStep } from "@/components/upload/steps/social-step";
+import { GovernanceStep } from "../steps/governance-step";
 
 // Extracted UI
 import WizardNav from "@/components/upload/wizard/wizard-nav";
@@ -155,8 +155,8 @@ export function ESGWizard({ onSubmit, initialValues }: ESGWizardProps) {
         <div className="p-1">
           {current === 1 && <GeneralStep />}
           {current === 2 && <EnvironmentStep />}
-          {current === 3 && <SocialStep />} {/* ← mount the real Social step */}
-          {current === 4 && <StepPlaceholder title="Step 4 — Governance" />}
+          {current === 3 && <SocialStep />}
+          {current === 4 && <GovernanceStep />}
         </div>
 
         {/* Footer (flat) */}
@@ -175,17 +175,5 @@ export function ESGWizard({ onSubmit, initialValues }: ESGWizardProps) {
         </div>
       </div>
     </FormProvider>
-  );
-}
-
-/* ------------------------------ Placeholder ------------------------------ */
-function StepPlaceholder({ title }: { title: string }) {
-  return (
-    <div className="text-sm">
-      <h2 className="bg-gradient-to-r from-[#3270a1] via-[#7e509c] to-[#8dcddb] bg-clip-text text-lg font-semibold text-transparent">
-        {title}
-      </h2>
-      <p className="mt-1 text-gray-700">This is a placeholder. You’ll mount the real step here.</p>
-    </div>
   );
 }
