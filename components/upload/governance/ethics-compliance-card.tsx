@@ -9,8 +9,15 @@ import {
   Divider,
 } from "@/components/upload/env/ui";
 import { Chip } from "../social/ui/chip";
-
+import { CURRENCIES } from "@/constants/foundational.constants";
 /* ============================== Types ============================== */
+
+type CurrencyLike = string | { value?: string; code?: string; label?: string; name?: string };
+
+const CURRENCY_OPTIONS: readonly string[] = (CURRENCIES as unknown as CurrencyLike[])
+  .map((c) => (typeof c === "string" ? c : c.value ?? c.code ?? ""))
+  .filter((s): s is string => !!s);
+
 
 export type YesNo = "yes" | "no";
 
@@ -58,7 +65,7 @@ export type PoliticalContributions = {
 export type EthicsComplianceValue = {
   policies: PoliciesBlock;
   trainingCoverage?: TrainingCoverage;
-  whistleblowingChannel: YesNo;
+  whistleblowingChannel?: YesNo;
   incidents?: IncidentsBlock;
   penalties?: PenaltiesBlock;
   politicalContributions?: PoliticalContributions;
@@ -275,12 +282,12 @@ export function EthicsComplianceCard({ value, onChange, readOnly }: Props) {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:max-w-xs">
           <SelectField
             label="Channel in place?"
-            value={value.whistleblowingChannel}
+            value={value.whistleblowingChannel ?? undefined}
             options={YES_NO as unknown as readonly string[]}
-            onChange={(v) =>
-              onChange({ whistleblowingChannel: (v as YesNo) || "no" })
-            }
+            onChange={(v) => onChange({ whistleblowingChannel: (v as YesNo | undefined) ?? undefined })}
+            allowEmpty
           />
+
         </div>
       </div>
 
@@ -337,17 +344,18 @@ export function EthicsComplianceCard({ value, onChange, readOnly }: Props) {
       <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <SectionHeader title="Fines & sanctions" />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <SelectField
+            label="Currency"
+            value={penalties.finesCurrency ?? undefined}
+            options={CURRENCY_OPTIONS}
+            onChange={(v) => patchPenalties({ finesCurrency: (v as string | undefined) ?? undefined })}
+            allowEmpty
+          />
           <NumberField
             label="Fines (amount)"
             value={penalties.finesAmount ?? ""}
             min={0}
             onChange={(n) => patchPenalties({ finesAmount: n ?? null })}
-          />
-          <TextField
-            label="Currency"
-            value={penalties.finesCurrency ?? ""}
-            onChange={(v) => patchPenalties({ finesCurrency: v ?? "" })}
-            placeholder="ISO code or symbol"
           />
           <NumberField
             label="Non-monetary sanctions (count)"
@@ -384,29 +392,23 @@ export function EthicsComplianceCard({ value, onChange, readOnly }: Props) {
           </label>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-2">
-          <NumberField
-            label="Amount"
-            value={contrib.none ? "" : contrib.amount ?? ""}
-            min={0}
-            onChange={(n) => patchContrib({ amount: contrib.none ? null : n ?? null })}
-          />
-          <TextField
-            label="Currency"
-            value={contrib.currency ?? ""}
-            onChange={(v) => patchContrib({ currency: v ?? "" })}
-            placeholder="ISO code or symbol"
-          />
-        </div>
-      </div>
-
-      <Divider />
-      <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
-        <span className="text-gray-700">
-          <u>Validation</u>: If “None” is ticked for political contributions, the amount is
-          forced to null. Training coverage (if set) is clamped to 0–100. Counts and amounts
-          must be non-negative.
-        </span>
+        {!contrib.none && (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-2">
+            <SelectField
+              label="Currency"
+              value={contrib.currency ?? undefined}
+              options={CURRENCY_OPTIONS}
+              onChange={(v) => patchContrib({ currency: (v as string | undefined) ?? undefined })}
+              allowEmpty
+            />
+            <NumberField
+              label="Amount"
+              value={contrib.amount ?? ""}
+              min={0}
+              onChange={(n) => patchContrib({ amount: n ?? null })}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

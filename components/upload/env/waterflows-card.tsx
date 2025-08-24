@@ -28,10 +28,11 @@ export function WaterFlowsCard({ value, onChange, readOnly }: WaterFlowsCardProp
   // Row adders
   const addWithdrawal = () => {
     const newRow: WithdrawalRow = {
-      source: "Surface water",
-      quality: "Freshwater",
-      unit: "m3",
-      method: "Meter",
+      source: undefined as any,
+      quality: undefined as any,
+      quantity: null,
+      unit: undefined as any,
+      method: undefined as any,
       period: { mode: "month", month: "" },
     };
     onChange({ withdrawals: [...(value.withdrawals ?? []), newRow] });
@@ -39,12 +40,13 @@ export function WaterFlowsCard({ value, onChange, readOnly }: WaterFlowsCardProp
 
   const addDischarge = () => {
     const newRow: DischargeRow = {
-      destination: "Surface water",
-      quality: "Freshwater",
-      treatmentLevel: "None",
-      sentToOtherOrgForReuse: "No",
-      unit: "m3",
-      method: "Meter",
+      destination: undefined as any,
+      quality: undefined as any,
+      treatmentLevel: undefined as any,
+      sentToOtherOrgForReuse: undefined as any,
+      quantity: null,
+      unit: undefined as any,
+      method: undefined as any,
       period: { mode: "month", month: "" },
     };
     onChange({ discharges: [...(value.discharges ?? []), newRow] });
@@ -191,7 +193,7 @@ export function WaterFlowsCard({ value, onChange, readOnly }: WaterFlowsCardProp
                 <LabeledSelect
                   className="lg:col-span-2"
                   label="Sent for reuse?"
-                  value={row.sentToOtherOrgForReuse ?? "No"}
+                  value={row.sentToOtherOrgForReuse}
                   onChange={(v) =>
                     updateDischarge(i, {
                       sentToOtherOrgForReuse: v as DischargeRow["sentToOtherOrgForReuse"],
@@ -307,6 +309,7 @@ function RowActions({ onRemove }: { onRemove: () => void }) {
 
 /* ----------------------------- Labeled fields ---------------------------- */
 
+// change props signature
 function LabeledSelect<T extends string>({
   label,
   value,
@@ -315,25 +318,34 @@ function LabeledSelect<T extends string>({
   disabled,
   renderLabel,
   className,
+  allowEmpty = true,
+  placeholderText = "Select…",
 }: {
   label: string;
   value: T | string | undefined;
-  onChange: (v: string) => void;
-  options: readonly T[] | string[];
+  onChange: (v: string | undefined) => void;
+  options?: readonly T[] | string[];
   disabled?: boolean;
   renderLabel?: (v: string) => string;
   className?: string;
+  allowEmpty?: boolean;
+  placeholderText?: string;
 }) {
+  const opts = options ?? ([] as readonly T[]);
+
   return (
     <div className={className}>
       <label className="mb-1 block text-sm text-gray-700">{label}</label>
       <select
-        className="h-10 w-full rounded-lg border border-gray-300/70 bg-white/70 px-2 outline-none ring-0 focus:border-gray-400 focus:outline-none disabled:opacity-60"
+        className="w-full rounded-lg border border-gray-300/70 bg-white/70 p-2 outline-none ring-0 focus:border-gray-400 focus:outline-none disabled:opacity-60"
         value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value || undefined)}
         disabled={disabled}
       >
-        {options.map((o) => {
+        <option value="" disabled={!allowEmpty}>
+          {placeholderText}
+        </option>
+        {opts.map((o) => {
           const key = String(o);
           return (
             <option key={key} value={key}>
@@ -345,6 +357,7 @@ function LabeledSelect<T extends string>({
     </div>
   );
 }
+
 
 function LabeledNumber({
   label,

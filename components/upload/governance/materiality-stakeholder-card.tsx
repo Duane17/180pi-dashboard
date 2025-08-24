@@ -25,9 +25,9 @@ export type StakeholderKey =
   | "other";
 
 export type Assessment = {
-  done: YesNoPlanned;          // "yes" | "no" | "planned"
-  method?: string;             // brief text
-  date?: string;               // ISO string (optional)
+  done?: YesNoPlanned;
+  method?: string;
+  date?: string;
 };
 
 export type CriticalConcernsComms = {
@@ -54,6 +54,17 @@ type Props = {
 
 const DONE_OPTS: readonly YesNoPlanned[] = ["yes", "no", "planned"];
 
+const FREQ_OPTS = ["every meeting", "quarterly", "ad hoc"] as const;
+
+
+// Method presets come from the previous "placeholder" examples, plus an explicit "Other"
+const METHOD_PRESETS = ["Double materiality screening", "Stakeholder survey"] as const;
+type MethodPreset = typeof METHOD_PRESETS[number];
+const METHOD_OPTS: readonly (MethodPreset | "Other")[] = [
+  ...METHOD_PRESETS,
+  "Other",
+];
+
 const STAKEHOLDERS: ReadonlyArray<{ key: StakeholderKey; label: string }> = [
   { key: "employees",   label: "Employees" },
   { key: "customers",   label: "Customers" },
@@ -70,7 +81,7 @@ function isSelected(arr: StakeholderKey[], k: StakeholderKey) {
 function toggle(arr: StakeholderKey[], k: StakeholderKey): StakeholderKey[] {
   return isSelected(arr, k) ? arr.filter((x) => x !== k) : [...arr, k];
 }
-function fmtStatus(done: YesNoPlanned): "done" | "planned" | "not_done" {
+function fmtStatus(done?: YesNoPlanned): "done" | "planned" | "not_done" {
   if (done === "yes") return "done";
   if (done === "planned") return "planned";
   return "not_done";
@@ -116,7 +127,7 @@ function PillToggle({
 /* ============================== Component ============================== */
 
 export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props) {
-  const assessment = value.assessment ?? { done: "no" as YesNoPlanned, method: "", date: "" };
+  const assessment = value.assessment ?? {};
   const stakeholders = value.stakeholderGroups ?? [];
   const topics = value.topMaterialTopics ?? [];
   const comms = value.criticalConcernsComms ?? { how: "", frequency: "", countToBoard: null };
@@ -127,6 +138,13 @@ export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props)
 
   const needsOtherText =
     stakeholders.includes("other") && !(value.otherStakeholderText ?? "").trim();
+
+  // --- Method preset/other derive ---
+  const methodStr = (assessment.method ?? "").trim();
+  const isPreset = (METHOD_PRESETS as readonly string[]).includes(methodStr);
+  const methodSelectValue: MethodPreset | "Other" | undefined =
+    isPreset ? (methodStr as MethodPreset) : methodStr ? "Other" : undefined;
+  const showMethodOther = methodSelectValue === "Other";
 
   // Handlers
   const patchAssessment = (p: Partial<Assessment>) =>
@@ -139,7 +157,6 @@ export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props)
 
   const addTopic = () =>
     onChange({ topMaterialTopics: [...topics, " "] });
-
 
   const updateTopic = (i: number, nextText: string) => {
     const next = topics.map((t, idx) => (idx === i ? nextText : t));
@@ -172,25 +189,62 @@ export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props)
       <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <SectionHeader title="Materiality assessment" />
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+          {/* Status (default-to-empty) */}
           <SelectField
             label="Assessment status"
-            value={assessment.done}
+            value={assessment.done ?? undefined}
             options={DONE_OPTS as unknown as readonly string[]}
-            onChange={(v) => patchAssessment({ done: (v as YesNoPlanned) || "no" })}
+            onChange={(v) =>
+              patchAssessment({ done: (v as YesNoPlanned | undefined) ?? undefined })
+            }
+            allowEmpty
           />
-          <TextField
-            label="Method (brief)"
-            value={assessment.method ?? ""}
-            onChange={(v) => patchAssessment({ method: v ?? "" })}
-            placeholder="Double materiality screening, stakeholder survey, etc."
+
+          {/* Method preset selector */}
+          <SelectField
+            label="Method"
+            value={methodSelectValue ?? undefined}
+            options={METHOD_OPTS as unknown as readonly string[]}
+            onChange={(v) => {
+              const sel = v as MethodPreset | "Other" | undefined;
+              if (!sel) {
+                // cleared
+                patchAssessment({ method: "" });
+              } else if (sel === "Other") {
+                // keep existing custom text if present, else blank
+                patchAssessment({ method: isPreset ? "" : methodStr });
+              } else {
+                // preset chosen
+                patchAssessment({ method: sel });
+              }
+            }}
+            allowEmpty
           />
-          <TextField
-            label="Date (ISO)"
-            value={assessment.date ?? ""}
-            onChange={(v) => patchAssessment({ date: v ?? "" })}
-            placeholder="YYYY-MM-DD"
-          />
+
+          {/* Date picker */}
+          <div>
+            <label className="block text-sm text-gray-800 mb-1">Date</label>
+            <input
+              type="date"
+              className="block w-full rounded-lg border border-gray-300/70 bg-white/70 px-3 py-2 text-sm text-gray-800 shadow-sm backdrop-blur focus:outline-none"
+              value={assessment.date ?? ""}
+              onChange={(e) => patchAssessment({ date: e.target.value ?? "" })}
+              disabled={readOnly}
+            />
+          </div>
         </div>
+
+        {/* Method other free text */}
+        {showMethodOther && (
+          <div className="mt-3 grid grid-cols-1 sm:max-w-xl">
+            <TextField
+              label="Method (other)"
+              value={assessment.method ?? ""}
+              onChange={(v) => patchAssessment({ method: v ?? "" })}
+              placeholder="e.g., regulatory scoping, expert workshops"
+            />
+          </div>
+        )}
 
         {/* Derived status */}
         <div className="mt-3 rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
@@ -265,39 +319,43 @@ export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props)
 
         {/* First row */}
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <TextField
+          <TextField
             label="How"
             value={comms.how ?? ""}
             onChange={(v) => patchComms({ how: v ?? "" })}
             placeholder="e.g., formal board papers, whistleblowing reports"
-            />
-            <TextField
+          />
+          <SelectField
             label="Frequency"
-            value={comms.frequency ?? ""}
-            onChange={(v) => patchComms({ frequency: v ?? "" })}
-            placeholder="e.g., every meeting, quarterly, ad hoc"
-            />
+            value={
+              comms.frequency && FREQ_OPTS.includes(comms.frequency as any)
+                ? (comms.frequency as string)
+                : undefined
+            }
+            options={FREQ_OPTS as unknown as readonly string[]}
+            onChange={(v) => patchComms({ frequency: (v as string | undefined) ?? "" })}
+            allowEmpty
+          />
         </div>
 
         {/* Second row */}
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <NumberField
+          <NumberField
             label="Communications to board (count)"
             value={comms.countToBoard ?? ""}
             min={0}
             onChange={(n) => patchComms({ countToBoard: n ?? null })}
-            />
-            <div className="flex items-end">
+          />
+          <div className="flex items-end">
             <div className="w-full rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
-                <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Chip label="Recorded" value={comms.countToBoard != null ? "yes" : "no"} />
                 <Chip label="Freq." value={comms.frequency || "—"} />
-                </div>
+              </div>
             </div>
-            </div>
+          </div>
         </div>
-        </div>
-
+      </div>
 
       <Divider />
       <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">

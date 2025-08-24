@@ -12,8 +12,8 @@ import {
   SELF_GEN_SOURCES,
   ENERGY_SOLD_TYPES,
   INTENSITY_DENOMINATORS,
-  COUNTRIES,
 } from "@/constants/esg.constants";
+import { COUNTRIES } from "@/constants/foundational.constants";
 import {
   EnergyCategory,
   toEnergyCategory,
@@ -68,21 +68,24 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
   const purchasedMWh = useMemo(() => {
     return purchased.reduce((acc, r) => {
       const explicit = r.volumeKWh ?? null;
-      const fromQty = toMWhFromEnergy(r.quantity ?? 0, r.unit);
+      const fromQty = r.unit ? toMWhFromEnergy(r.quantity ?? 0, r.unit) : 0;
       const mwh = explicit != null && Number.isFinite(explicit) ? explicit / 1000 : fromQty;
       return acc + (Number.isFinite(mwh) ? mwh : 0);
     }, 0);
   }, [purchased]);
+
 
   // Fuels → MWh (via NCV * quantity / 1000)
   const fuelsMWh = useMemo(() => {
     return fuels.reduce((acc, r) => {
       const fType =
         r.renewable === "Yes" ? (r.renewableSubtype ?? r.fuelType) : (r.nonRenewableSubtype ?? r.fuelType);
+      if (!r.unit || !fType) return acc;          // ← guard when empty
       const mwh = fuelToMWh(r.quantity ?? 0, r.unit, fType);
       return acc + (Number.isFinite(mwh) ? mwh : 0);
     }, 0);
   }, [fuels]);
+
 
   // Self-generated → use ONLY self-consumed for consumption total
   const selfGenConsumedMWh = useMemo(() => {
@@ -174,28 +177,36 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
           setPurchased((r) => [
             ...r,
             {
-              energyType: "Electricity",
+              energyType: undefined as any,
               quantity: null,
-              unit: "kWh",
+              unit: undefined as any,
               country: undefined,
               supplierFactorKgCO2ePerKWh: null,
-              hasCertificates: "No",
+              hasCertificates: undefined as any,
               volumeKWh: null,
-              renewable: "No",
+              renewable: undefined as any,
             },
           ])
         }
         onUpdate={(i, patch) =>
-          setPurchased((rows) => rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
+          setPurchased((rows) =>
+            rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row))
+          )
         }
         onRemove={(i) => setPurchased((rows) => rows.filter((_, idx) => idx !== i))}
         render={(row, update) => (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+            {/* Row 1 */}
             <SelectField
               label="Energy type"
               value={row.energyType}
               options={ENERGY_PURCHASED_TYPES}
-              onChange={(v) => update({ energyType: v as PurchasedEnergyRow["energyType"] })}
+              onChange={(v) =>
+                update({
+                  energyType: v as PurchasedEnergyRow["energyType"] | undefined,
+                })
+              }
+              allowEmpty
             />
             <NumberField
               label="Quantity"
@@ -208,7 +219,10 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
               value={row.unit}
               options={QUANTITY_UNITS_ENERGY}
               onChange={(v) => update({ unit: v as PurchasedEnergyRow["unit"] })}
+              allowEmpty
             />
+
+            {/* Row 2 */}
             <SelectField
               label="Country/Region"
               value={row.country ?? ""}
@@ -224,10 +238,15 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
             />
             <SelectField
               label="Certificates / green tariff / PPA?"
-              value={row.hasCertificates ?? "No"}
+              value={row.hasCertificates}
               options={YES_NO}
-              onChange={(v) => update({ hasCertificates: v as "Yes" | "No" })}
+              onChange={(v) =>
+                update({ hasCertificates: v as "Yes" | "No" | undefined })
+              }
+              allowEmpty
             />
+
+            {/* Row 3 */}
             <NumberField
               label="Volume (kWh)"
               value={row.volumeKWh ?? ""}
@@ -237,13 +256,18 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
             />
             <SelectField
               label="Renewable source?"
-              value={row.renewable ?? "No"}
+              value={row.renewable}
               options={YES_NO}
-              onChange={(v) => update({ renewable: v as "Yes" | "No" })}
+              onChange={(v) =>
+                update({ renewable: v as "Yes" | "No" | undefined })
+              }
+              allowEmpty
             />
+            <div /> {/* filler to keep the last row balanced */}
           </div>
         )}
       />
+
 
       <Divider />
 
@@ -258,81 +282,110 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
           setFuels((r) => [
             ...r,
             {
-              use: "Stationary",
-              fuelType: "diesel",
+              use: undefined as any,
+              fuelType: undefined as any,
               quantity: null,
-              unit: "L",
-              renewable: "No",
-              nonRenewableSubtype: "diesel",
+              unit: undefined as any,
+              renewable: undefined as any,
+              nonRenewableSubtype: undefined as any,
             },
           ])
         }
         onUpdate={(i, patch) =>
-          setFuels((rows) => rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
+          setFuels((rows) =>
+            rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row))
+          )
         }
         onRemove={(i) => setFuels((rows) => rows.filter((_, idx) => idx !== i))}
         render={(row, update) => {
           const isRenew = row.renewable === "Yes";
           return (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                <SelectField
-                  label="Use"
-                  value={row.use}
-                  options={FUEL_USES}
-                  onChange={(v) => update({ use: v as FuelRow["use"] })}
-                />
-                <SelectField
-                  label="Fuel type"
-                  value={row.fuelType}
-                  options={FUEL_TYPES}
-                  onChange={(v) => update({ fuelType: v as FuelRow["fuelType"] })}
-                />
-                <NumberField
-                  label="Quantity"
-                  value={row.quantity ?? ""}
-                  min={0}
-                  onChange={(n) => update({ quantity: n })}
-                />
-                <SelectField
-                  label="Unit"
-                  value={row.unit}
-                  options={FUEL_UNITS}
-                  onChange={(v) => update({ unit: v as FuelRow["unit"] })}
-                />
-                <SelectField
-                  label="Renewable?"
-                  value={row.renewable ?? "No"}
-                  options={YES_NO}
-                  onChange={(v) => update({ renewable: v as "Yes" | "No" })}
-                />
-                {isRenew ? (
+              {/* Inputs grid: 3 rows × 3 cols */}
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+                <div className="min-w-0">
                   <SelectField
-                    label="Renewable subtype"
-                    value={row.renewableSubtype ?? "biomass"}
-                    options={["biomass", "biogas"] as const}
-                    onChange={(v) =>
-                      update({
-                        renewableSubtype: v as "biomass" | "biogas",
-                        nonRenewableSubtype: undefined,
-                      })
-                    }
+                    label="Use"
+                    value={row.use}
+                    options={FUEL_USES}
+                    onChange={(v) => update({ use: v as FuelRow["use"] })}
+                    allowEmpty
                   />
-                ) : (
+                </div>
+
+                <div className="min-w-0">
                   <SelectField
-                    label="Non-renewable subtype"
-                    value={row.nonRenewableSubtype ?? "diesel"}
-                    options={
-                      ["diesel", "petrol", "natural_gas", "LPG", "coal", "kerosene"] as const
-                    }
-                    onChange={(v) =>
-                      update({
-                        nonRenewableSubtype: v as FuelRow["nonRenewableSubtype"],
-                        renewableSubtype: undefined,
-                      })
-                    }
+                    label="Fuel type"
+                    value={row.fuelType}
+                    options={FUEL_TYPES}
+                    onChange={(v) => update({ fuelType: v as FuelRow["fuelType"] })}
+                    allowEmpty
                   />
-                )}
+                </div>
+
+                <div className="min-w-0">
+                  <NumberField
+                    label="Quantity"
+                    value={row.quantity ?? ""}
+                    min={0}
+                    onChange={(n) => update({ quantity: n })}
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  <SelectField
+                    label="Unit"
+                    value={row.unit}
+                    options={FUEL_UNITS}
+                    onChange={(v) => update({ unit: v as FuelRow["unit"] })}
+                    allowEmpty
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  <SelectField
+                    label="Renewable?"
+                    value={row.renewable}
+                    options={YES_NO}
+                    onChange={(v) =>
+                      update({ renewable: v as "Yes" | "No" | undefined })
+                    }
+                    allowEmpty
+                  />
+                </div>
+
+                <div className="min-w-0">
+                  {isRenew ? (
+                    <SelectField
+                      label="Renewable subtype"
+                      value={row.renewableSubtype}
+                      options={["biomass", "biogas"] as const}
+                      onChange={(v) =>
+                        update({
+                          renewableSubtype: v as "biomass" | "biogas" | undefined,
+                          nonRenewableSubtype: undefined,
+                        })
+                      }
+                      allowEmpty
+                    />
+                  ) : (
+                    <SelectField
+                      label="Non-renewable subtype"
+                      value={row.nonRenewableSubtype}
+                      options={
+                        ["diesel", "petrol", "natural_gas", "LPG", "coal", "kerosene"] as const
+                      }
+                      onChange={(v) =>
+                        update({
+                          nonRenewableSubtype:
+                            v as FuelRow["nonRenewableSubtype"] | undefined,
+                          renewableSubtype: undefined,
+                        })
+                      }
+                      allowEmpty
+                    />
+                  )}
+                </div>
               </div>
 
               <div className="text-xs text-gray-600">
@@ -342,9 +395,9 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
                     fuelToMWh(
                       row.quantity ?? 0,
                       row.unit,
-                      (row.renewable === "Yes"
-                        ? (row.renewableSubtype ?? row.fuelType)
-                        : (row.nonRenewableSubtype ?? row.fuelType))
+                      row.renewable === "Yes"
+                        ? row.renewableSubtype ?? row.fuelType
+                        : row.nonRenewableSubtype ?? row.fuelType
                     )
                   )}{" "}
                   MWh
@@ -354,6 +407,7 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
           );
         }}
       />
+
 
       <Divider />
 
@@ -365,25 +419,31 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
           setSelfGen((r) => [
             ...r,
             {
-              source: "Solar PV",
+              source: undefined as any,
               grossKWh: null,
               selfConsumedKWh: null,
               exportedKWh: null,
-              fuelBased: "No",
+              fuelBased: undefined as any,
             },
           ])
         }
         onUpdate={(i, patch) =>
-          setSelfGen((rows) => rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
+          setSelfGen((rows) =>
+            rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row))
+          )
         }
         onRemove={(i) => setSelfGen((rows) => rows.filter((_, idx) => idx !== i))}
         render={(row, update) => (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+            {/* Row 1 */}
             <SelectField
               label="Source"
               value={row.source}
               options={SELF_GEN_SOURCES}
-              onChange={(v) => update({ source: v as SelfGenRow["source"] })}
+              onChange={(v) =>
+                update({ source: v as SelfGenRow["source"] | undefined })
+              }
+              allowEmpty
             />
             <NumberField
               label="Gross generation (kWh)"
@@ -397,6 +457,8 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
               min={0}
               onChange={(n) => update({ selfConsumedKWh: n })}
             />
+
+            {/* Row 2 */}
             <NumberField
               label="Exported/sold (kWh)"
               value={row.exportedKWh ?? ""}
@@ -405,13 +467,18 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
             />
             <SelectField
               label="Fuel-based?"
-              value={row.fuelBased ?? "No"}
+              value={row.fuelBased}
               options={YES_NO}
-              onChange={(v) => update({ fuelBased: v as "Yes" | "No" })}
+              onChange={(v) =>
+                update({ fuelBased: v as "Yes" | "No" | undefined })
+              }
+              allowEmpty
             />
+            <div /> {/* filler to balance last row */}
           </div>
         )}
       />
+
 
       <Divider />
 
@@ -419,7 +486,7 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
       <SectionHeader title="Energy sold (optional)" />
       <RowList
         rows={sold}
-        onAdd={() => setSold((r) => [...r, { type: "Electricity", kWh: null }])}
+        onAdd={() => setSold((r) => [...r, { type: undefined as any, kWh: null }])}
         onUpdate={(i, patch) =>
           setSold((rows) => rows.map((row, idx) => (idx === i ? { ...row, ...patch } : row)))
         }
@@ -430,7 +497,8 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
               label="Type"
               value={row.type}
               options={ENERGY_SOLD_TYPES}
-              onChange={(v) => update({ type: v as EnergySoldRow["type"] })}
+              onChange={(v) => update({ type: v as EnergySoldRow["type"] | undefined })}
+              allowEmpty
             />
             <NumberField
               label="kWh"
@@ -449,10 +517,10 @@ export function ResourceConsumptionCard({ value, onChange, errors }: Props) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <SelectField
           label="Denominator"
-          value={intensity.denominatorType ?? ""}
+          value={intensity.denominatorType}
           options={INTENSITY_DENOMINATORS}
           onChange={(v) =>
-            setIntensity((s) => ({ ...s, denominatorType: v as IntensityState["denominatorType"] }))
+            setIntensity((s) => ({ ...s, denominatorType: v as IntensityState["denominatorType"] | undefined }))
           }
           allowEmpty
         />

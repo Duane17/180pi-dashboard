@@ -42,7 +42,7 @@ export function RowList<T>({
           className="rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-md"
           style={{ background: "linear-gradient(90deg, #3270a1 0%, #7e509c 50%, #8dcddb 100%)" }}
         >
-          Add row
+          Add entry
         </button>
       </div>
 
@@ -139,16 +139,18 @@ export function SelectField<T extends string>({
   value,
   options,
   onChange,
-  allowEmpty = true,             
-  placeholderText = "Select…",   
+  allowEmpty = true,
+  placeholderText = "Select…",
 }: {
   label: string;
   value: string | undefined;
-  options: readonly T[];
+  options?: readonly T[];                    // ← make optional
   onChange: (v: string | undefined) => void;
   allowEmpty?: boolean;
   placeholderText?: string;
 }) {
+  const opts = options ?? ([] as readonly T[]); // ← guard
+
   return (
     <div>
       <label className="mb-1 block text-sm text-gray-700">{label}</label>
@@ -157,16 +159,11 @@ export function SelectField<T extends string>({
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value || undefined)}
       >
-        {/* Always render placeholder first so the first real option is never auto-selected */}
-        <option
-          value=""
-          disabled={!allowEmpty}     // if not clearable, placeholder is disabled but still shown first
-          hidden={false}             // keep visible even when disabled
-        >
+        <option value="" disabled={!allowEmpty}>
           {placeholderText}
         </option>
 
-        {options.map((o) => (
+        {opts.map((o) => (
           <option key={o} value={o}>
             {o}
           </option>
@@ -175,4 +172,5 @@ export function SelectField<T extends string>({
     </div>
   );
 }
+
 

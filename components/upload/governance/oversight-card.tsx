@@ -20,22 +20,24 @@ export type AssuranceLevel = "none" | "limited" | "reasonable";
 
 export type NamesRolesRow = { name: string; role: string };
 
+// ⬇ Make nested select fields optional so they can be empty (undefined)
 export type ReportApprovalValue = {
-  approver: Approver;
-  approved: YesNo;
+  approver?: Approver;
+  approved?: YesNo;
 };
 
 export type AssuranceValue = {
-  level: AssuranceLevel;
+  level?: AssuranceLevel;
   providerName?: string;
 };
 
+// ⬇ Make top-level select fields optional so they can be empty (undefined)
 export type OversightValue = {
-  oversightBody: OversightBody;
+  oversightBody?: OversightBody;
   namesRoles: NamesRolesRow[];
-  briefingFrequency: BriefingFrequency;
-  reportApproval: ReportApprovalValue;
-  assurance: AssuranceValue;
+  briefingFrequency?: BriefingFrequency;
+  reportApproval?: ReportApprovalValue;
+  assurance?: AssuranceValue;
 };
 
 type Props = {
@@ -49,8 +51,8 @@ type Props = {
 const OVERSIGHT_OPTS = ["board", "committee", "senior_executive"] as const;
 const FREQ_OPTS = ["every_meeting", "quarterly", "annually", "ad_hoc"] as const;
 const APPROVER_OPTS = ["board", "committee", "executive"] as const;
-const YES_NO: readonly YesNo[] = ["yes", "no"];
-const ASSURANCE_OPTS: readonly AssuranceLevel[] = ["none", "limited", "reasonable"];
+const YES_NO = ["yes", "no"] as const;
+const ASSURANCE_OPTS = ["none", "limited", "reasonable"] as const;
 
 /* ============================== Helpers ============================== */
 
@@ -63,9 +65,12 @@ function uid() {
 export function OversightCard({ value, onChange }: Props) {
   const namesRoles = value.namesRoles ?? [];
 
-  // Derived flags
+  // Derived flags (tolerant of undefined)
   const esgOversightPresent = useMemo(() => !!value.oversightBody, [value.oversightBody]);
-  const approvalBodyRecorded = useMemo(() => !!value.reportApproval?.approver, [value.reportApproval]);
+  const approvalBodyRecorded = useMemo(
+    () => !!value.reportApproval?.approver,
+    [value.reportApproval?.approver]
+  );
 
   // Handlers
   const addRow = () =>
@@ -82,7 +87,8 @@ export function OversightCard({ value, onChange }: Props) {
     onChange({ namesRoles: next });
   };
 
-  const assuranceNeedsProvider = value.assurance?.level && value.assurance.level !== "none";
+  const assuranceLevel = value.assurance?.level;
+  const assuranceNeedsProvider = !!assuranceLevel && assuranceLevel !== "none";
 
   return (
     <div className="space-y-6">
@@ -102,21 +108,19 @@ export function OversightCard({ value, onChange }: Props) {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SelectField
             label="Oversight body"
-            value={value.oversightBody}
+            value={value.oversightBody ?? undefined} // ⬅ empty when undefined
             options={OVERSIGHT_OPTS as unknown as readonly string[]}
-            onChange={(v) =>
-              onChange({ oversightBody: (v as OversightBody) || "board" })
-            }
+            onChange={(v) => onChange({ oversightBody: (v as OversightBody | undefined) ?? undefined })}
+            allowEmpty
           />
           <SelectField
             label="Briefing frequency"
-            value={value.briefingFrequency}
+            value={value.briefingFrequency ?? undefined} // ⬅ empty when undefined
             options={FREQ_OPTS as unknown as readonly string[]}
             onChange={(v) =>
-              onChange({
-                briefingFrequency: (v as BriefingFrequency) || "quarterly",
-              })
+              onChange({ briefingFrequency: (v as BriefingFrequency | undefined) ?? undefined })
             }
+            allowEmpty
           />
           <div className="sm:col-span-1 flex items-end">
             <div className="w-full rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
@@ -132,9 +136,9 @@ export function OversightCard({ value, onChange }: Props) {
           <SectionHeader title="People (names & roles)" />
           <RowList
             rows={namesRoles}
-            onAdd={() => addRow()}
-            onRemove={(i) => removeRow(i)}
-            onUpdate={(i, patch) => updateRow(i, patch)}
+            onAdd={addRow}
+            onRemove={removeRow}
+            onUpdate={updateRow}
             render={(row, update) => (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <TextField
@@ -159,29 +163,31 @@ export function OversightCard({ value, onChange }: Props) {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SelectField
             label="Approver (body)"
-            value={value.reportApproval?.approver ?? "board"}
+            value={value.reportApproval?.approver ?? undefined} // ⬅ empty until chosen
             options={APPROVER_OPTS as unknown as readonly string[]}
             onChange={(v) =>
               onChange({
                 reportApproval: {
-                  approver: (v as Approver) || "board",
-                  approved: value.reportApproval?.approved ?? "no",
+                  approver: (v as Approver | undefined) ?? undefined,
+                  approved: value.reportApproval?.approved, // keep as-is (can be undefined)
                 },
               })
             }
+            allowEmpty
           />
           <SelectField
             label="Approved?"
-            value={value.reportApproval?.approved ?? "no"}
+            value={value.reportApproval?.approved ?? undefined} // ⬅ empty until chosen
             options={YES_NO as unknown as readonly string[]}
             onChange={(v) =>
               onChange({
                 reportApproval: {
-                  approver: value.reportApproval?.approver ?? "board",
-                  approved: (v as YesNo) || "no",
+                  approver: value.reportApproval?.approver, // keep as-is (can be undefined)
+                  approved: (v as YesNo | undefined) ?? undefined,
                 },
               })
             }
+            allowEmpty
           />
           <div className="sm:col-span-1 flex items-end">
             <div className="w-full rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
@@ -193,16 +199,18 @@ export function OversightCard({ value, onChange }: Props) {
 
           <SelectField
             label="Assurance level"
-            value={value.assurance?.level ?? "none"}
+            value={value.assurance?.level ?? undefined} // ⬅ empty until chosen
             options={ASSURANCE_OPTS as unknown as readonly string[]}
             onChange={(v) =>
               onChange({
                 assurance: {
-                  level: (v as AssuranceLevel) || "none",
+                  level: (v as AssuranceLevel | undefined) ?? undefined,
+                  // keep provider text; if undefined, default to ""
                   providerName: value.assurance?.providerName ?? "",
                 },
               })
             }
+            allowEmpty
           />
           <TextField
             label="Assurance provider (optional)"
@@ -210,7 +218,7 @@ export function OversightCard({ value, onChange }: Props) {
             onChange={(v) =>
               onChange({
                 assurance: {
-                  level: value.assurance?.level ?? "none",
+                  level: value.assurance?.level, // keep as-is (can be undefined)
                   providerName: v ?? "",
                 },
               })
@@ -223,11 +231,11 @@ export function OversightCard({ value, onChange }: Props) {
       {/* Summary chips */}
       <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <div className="flex flex-wrap gap-2">
-          <Chip label="Oversight" value={value.oversightBody} />
-          <Chip label="Frequency" value={value.briefingFrequency} />
+          <Chip label="Oversight" value={value.oversightBody ?? "—"} />
+          <Chip label="Frequency" value={value.briefingFrequency ?? "—"} />
           <Chip label="Approver" value={value.reportApproval?.approver ?? "—"} />
           <Chip label="Approved?" value={value.reportApproval?.approved ?? "—"} />
-          <Chip label="Assurance" value={value.assurance?.level ?? "none"} />
+          <Chip label="Assurance" value={value.assurance?.level ?? "—"} />
           {value.assurance?.providerName?.trim() ? (
             <Chip label="Provider" value={value.assurance.providerName.trim()} />
           ) : null}
@@ -237,7 +245,7 @@ export function OversightCard({ value, onChange }: Props) {
       <Divider />
       <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <span className="text-gray-700">
-          <u>Notes</u>: Provider is optional even when assurance is limited/reasonable. Oversight present/approval recorded are UI flags.
+          <u>Notes</u>: Provider is optional even when assurance is limited/reasonable. “Oversight present” and “Approval body recorded” are UI indicators only.
         </span>
       </div>
     </div>

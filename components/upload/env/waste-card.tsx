@@ -41,19 +41,20 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
   const addRow = () => {
     if (readOnly) return;
     const next: WasteRow = {
-      stream: "Paper & cardboard",
-      hazardClass: "Non-hazardous",
-      physicalState: "Solid",
-      managementRoute: "Diverted from disposal",
-      managementMethod: "Recycling",
-      destination: "Off-site",
+      stream: undefined as any,
+      hazardClass: undefined as any,
+      physicalState: undefined as any,
+      managementRoute: undefined as any,
+      managementMethod: undefined as any,
+      destination: undefined as any,
       quantity: null,
-      unit: "kg",
-      measurementMethod: "Weighbridge",
+      unit: undefined as any,
+      measurementMethod: undefined as any,
       otherStreamText: undefined,
     };
     onChange({ rows: [...rows, next] });
   };
+
 
   const updateRow = (i: number, patch: Partial<WasteRow>) => {
     const next = [...rows];
@@ -107,17 +108,23 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
 
           return (
             <>
-              {/* Inputs grid: 2-up small, 3-up md, 6-up lg */}
-              <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-                <div className="min-w-0 md:col-span-1 lg:col-span-2">
+              {/* Inputs grid: 3 rows × 3 cols on large screens */}
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+                {/* Row 1 */}
+                <div className="min-w-0">
                   <SelectField
                     label="Waste stream"
                     value={row.stream}
                     options={WASTE_STREAMS}
                     onChange={(v) => {
-                      const stream = (v as WasteRow["stream"]) || "Paper & cardboard";
-                      update({ stream, otherStreamText: stream === "Other (specify)" ? (row.otherStreamText ?? "") : undefined });
+                      const stream = v as WasteRow["stream"] | undefined;
+                      update({
+                        stream,
+                        otherStreamText:
+                          stream === "Other (specify)" ? (row.otherStreamText ?? "") : undefined,
+                      });
                     }}
+                    allowEmpty
                   />
                   {row.stream === "Other (specify)" && (
                     <div className="mt-2">
@@ -135,7 +142,8 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
                     label="Hazard class"
                     value={row.hazardClass}
                     options={WASTE_HAZARD_CLASSES}
-                    onChange={(v) => update({ hazardClass: v as WasteRow["hazardClass"] })}
+                    onChange={(v) => update({ hazardClass: v as WasteRow["hazardClass"] | undefined })}
+                    allowEmpty
                   />
                 </div>
 
@@ -144,10 +152,12 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
                     label="Physical state"
                     value={row.physicalState}
                     options={WASTE_STATES}
-                    onChange={(v) => update({ physicalState: v as WasteRow["physicalState"] })}
+                    onChange={(v) => update({ physicalState: v as WasteRow["physicalState"] | undefined })}
+                    allowEmpty
                   />
                 </div>
 
+                {/* Row 2 */}
                 <div className="min-w-0">
                   <SelectField
                     label="Route"
@@ -155,12 +165,11 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
                     options={WASTE_ROUTES}
                     onChange={(v) =>
                       update({
-                        managementRoute: v as WasteRow["managementRoute"],
-                        // reset method to a valid default for the route
-                        managementMethod:
-                          v === "Diverted from disposal" ? "Recycling" : "Landfill",
+                        managementRoute: v as WasteRow["managementRoute"] | undefined,
+                        managementMethod: undefined, // reset so user picks compatible method
                       })
                     }
+                    allowEmpty
                   />
                 </div>
 
@@ -169,7 +178,8 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
                     label="Method"
                     value={row.managementMethod}
                     options={methodsForRoute}
-                    onChange={(v) => update({ managementMethod: v as WasteRow["managementMethod"] })}
+                    onChange={(v) => update({ managementMethod: v as WasteRow["managementMethod"] | undefined })}
+                    allowEmpty
                   />
                 </div>
 
@@ -178,10 +188,12 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
                     label="Destination"
                     value={row.destination}
                     options={WASTE_DESTINATIONS}
-                    onChange={(v) => update({ destination: v as WasteRow["destination"] })}
+                    onChange={(v) => update({ destination: v as WasteRow["destination"] | undefined })}
+                    allowEmpty
                   />
                 </div>
 
+                {/* Row 3 */}
                 <div className="min-w-0">
                   <NumberField
                     label="Quantity"
@@ -196,18 +208,20 @@ export function WasteCard({ value, onChange, readOnly }: Props) {
                     label="Unit"
                     value={row.unit}
                     options={WASTE_UNITS}
-                    onChange={(v) => update({ unit: v as WasteRow["unit"] })}
+                    onChange={(v) => update({ unit: v as WasteRow["unit"] | undefined })}
+                    allowEmpty
                   />
                 </div>
 
-                <div className="min-w-0 md:col-span-1 lg:col-span-2">
+                <div className="min-w-0">
                   <SelectField
                     label="Measurement method"
                     value={row.measurementMethod}
                     options={WASTE_MEASUREMENT_METHODS}
                     onChange={(v) =>
-                      update({ measurementMethod: v as WasteRow["measurementMethod"] })
+                      update({ measurementMethod: v as WasteRow["measurementMethod"] | undefined })
                     }
+                    allowEmpty
                   />
                 </div>
               </div>

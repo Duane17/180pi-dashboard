@@ -10,9 +10,15 @@ import {
   Divider,
 } from "@/components/upload/env/ui";
 import { Chip } from "../social/ui/chip";
+import { CURRENCIES } from "@/constants/foundational.constants";
 
 /* ============================== Types ============================== */
+type CurrencyLike = string | { value?: string; code?: string; label?: string; name?: string };
+  const CURRENCY_OPTIONS: readonly string[] = (CURRENCIES as unknown as CurrencyLike[])
+    .map((c) => (typeof c === "string" ? c : c.value ?? c.code ?? ""))
+    .filter((s): s is string => !!s);
 
+    
 export type YesNo = "yes" | "no";
 
 export type AuditorValue = {
@@ -23,7 +29,7 @@ export type AuditorValue = {
   };
   internalAuditFunction?: YesNo;
   criticalConcerns?: {
-    mechanism: YesNo;
+    mechanism?: YesNo;
     raised?: number | null;
     resolved?: number | null;
   };
@@ -67,9 +73,9 @@ export function AuditorControlsCard({ value, onChange }: Props) {
     initialYear: null,
     latestRotationYear: null,
   };
-  const internal = (value.internalAuditFunction as YesNo) ?? "no";
+  const internal = value.internalAuditFunction ?? undefined;
   const concerns = value.criticalConcerns ?? {
-    mechanism: "no" as YesNo,
+    mechanism: undefined,
     raised: null,
     resolved: null,
   };
@@ -183,11 +189,12 @@ export function AuditorControlsCard({ value, onChange }: Props) {
           <div>
             <SelectField
               label="Internal audit function?"
-              value={internal}
+              value={internal ?? undefined}
               options={YES_NO as unknown as readonly string[]}
               onChange={(v) =>
-                onChange({ internalAuditFunction: (v as YesNo) || "no" })
+                onChange({ internalAuditFunction: (v as YesNo | undefined) ?? undefined })
               }
+              allowEmpty
             />
           </div>
 
@@ -208,6 +215,13 @@ export function AuditorControlsCard({ value, onChange }: Props) {
 
         {/* Fees grid */}
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <SelectField
+            label="Currency"
+            value={fees.currency ?? undefined}
+            options={CURRENCY_OPTIONS}
+            onChange={(v) => patchFees({ currency: (v as string | undefined) ?? undefined })}
+            allowEmpty
+          />
           <NumberField
             label="Total fees"
             value={fees.total ?? ""}
@@ -221,12 +235,6 @@ export function AuditorControlsCard({ value, onChange }: Props) {
             onChange={(n) => patchFees({ nonAudit: n ?? null })}
             error={nonAuditGtTotal ? "Cannot exceed Total fees" : undefined}
           />
-          <TextField
-            label="Currency"
-            value={fees.currency ?? ""}
-            onChange={(v) => patchFees({ currency: v ?? "" })}
-            placeholder="ISO code or symbol"
-          />
         </div>
       </div>
 
@@ -236,11 +244,12 @@ export function AuditorControlsCard({ value, onChange }: Props) {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SelectField
             label="Mechanism in place?"
-            value={concerns.mechanism}
+            value={concerns.mechanism ?? undefined}
             options={YES_NO as unknown as readonly string[]}
             onChange={(v) =>
-              patchConcerns({ mechanism: (v as YesNo) || "no" })
+              patchConcerns({ mechanism: (v as YesNo | undefined) ?? undefined })
             }
+            allowEmpty
           />
           <NumberField
             label="Concerns raised"

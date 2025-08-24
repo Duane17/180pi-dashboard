@@ -11,24 +11,29 @@ import {
   Divider,
 } from "@/components/upload/env/ui";
 import { Chip } from "../social/ui/chip";
+import { CURRENCIES } from "@/constants/foundational.constants";
 
 /* ============================== Types ============================== */
+type CurrencyLike = string | { value?: string; code?: string; label?: string; name?: string };
+  const CURRENCY_OPTIONS: readonly string[] = (CURRENCIES as unknown as CurrencyLike[])
+    .map((c) => (typeof c === "string" ? c : c.value ?? c.code ?? ""))
+    .filter((s): s is string => !!s);
 
 export type YesNo = "yes" | "no";
 
 export type RptRow = {
   id: string;
   counterparty: string;
-  relationship:
+  relationship?:
     | "shareholder"
     | "director_related"
     | "affiliate"
     | "key_management"
     | "other";
   amount: { value: number | null; currency: string };
-  nature: "goods" | "services" | "loan" | "lease" | "other";
-  armsLength: YesNo;
-  independentApproval: YesNo;
+  nature?: "goods" | "services" | "loan" | "lease" | "other";
+  armsLength?: YesNo;
+  independentApproval?: YesNo;
   notes?: string;
 };
 
@@ -109,11 +114,11 @@ export function RelatedPartyTransactionsCard({ value, onChange, readOnly }: Prop
     const next: RptRow = {
       id: crypto.randomUUID(),
       counterparty: "",
-      relationship: "shareholder",
+      relationship: undefined,
       amount: { value: null, currency: "" },
-      nature: "goods",
-      armsLength: "yes",
-      independentApproval: "yes",
+      nature: undefined,
+      armsLength: undefined,
+      independentApproval: undefined,
       notes: "",
     };
     setRows([...(rows ?? []), next]);
@@ -155,98 +160,105 @@ export function RelatedPartyTransactionsCard({ value, onChange, readOnly }: Prop
             const cur = (row.amount?.currency ?? "").trim();
             const amt = row.amount?.value;
             const amountNegative = amt != null && Number(amt) < 0;
-            const currencyMissing = amt != null && Number.isFinite(Number(amt)) && Number(amt) > 0 && !cur;
+            const currencyMissing =
+              amt != null && Number.isFinite(Number(amt)) && Number(amt) > 0 && !cur;
 
             const isNonArms = row.armsLength === "no";
             const noIndep = row.independentApproval === "no";
 
             return (
               <div className="space-y-4">
-                {/* Row A: Counterparty • Relationship • Nature • Amount */}
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-6 lg:grid-cols-12">
-                  <div className="md:col-span-3 lg:col-span-4">
-                    <TextField
-                      label="Counterparty"
-                      value={row.counterparty}
-                      onChange={(v) => update({ counterparty: v ?? "" })}
-                      placeholder="Name"
-                    />
-                  </div>
-
-                  <div className="md:col-span-3 lg:col-span-3">
-                    <SelectField
-                      label="Relationship"
-                      value={RELATIONSHIP_OPTS.find((o) => o.value === row.relationship)?.label}
-                      options={RELATIONSHIP_OPTS.map((o) => o.label) as unknown as readonly string[]}
-                      onChange={(label) => {
-                        const found = RELATIONSHIP_OPTS.find((o) => o.label === label)?.value ?? "shareholder";
-                        update({ relationship: found as RptRow["relationship"] });
-                      }}
-                    />
-                  </div>
-
-                  <div className="md:col-span-3 lg:col-span-3">
-                    <SelectField
-                      label="Nature"
-                      value={NATURE_OPTS.find((o) => o.value === row.nature)?.label}
-                      options={NATURE_OPTS.map((o) => o.label) as unknown as readonly string[]}
-                      onChange={(label) => {
-                        const found = NATURE_OPTS.find((o) => o.label === label)?.value ?? "goods";
-                        update({ nature: found as RptRow["nature"] });
-                      }}
-                    />
-                  </div>
-
-                  <div className="md:col-span-3 lg:col-span-2">
-                    <NumberField
-                      label="Amount"
-                      value={amt ?? ""}
-                      min={0}
-                      onChange={(n) => update({ amount: { ...row.amount, value: n ?? null } })}
-                      error={amountNegative ? "Must be ≥ 0" : undefined}
-                    />
-                  </div>
+                {/* Row A: Counterparty • Relationship • Nature */}
+                <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+                  <TextField
+                    label="Counterparty"
+                    value={row.counterparty}
+                    onChange={(v) => update({ counterparty: v ?? "" })}
+                    placeholder="Name"
+                  />
+                  <SelectField
+                    label="Relationship"
+                    value={
+                      row.relationship
+                        ? RELATIONSHIP_OPTS.find((o) => o.value === row.relationship)?.label
+                        : undefined
+                    }
+                    options={RELATIONSHIP_OPTS.map(
+                      (o) => o.label
+                    ) as unknown as readonly string[]}
+                    onChange={(label) => {
+                      const found = RELATIONSHIP_OPTS.find((o) => o.label === label)?.value;
+                      update({
+                        relationship: (found as RptRow["relationship"] | undefined) ?? undefined,
+                      });
+                    }}
+                    allowEmpty
+                  />
+                  <SelectField
+                    label="Nature"
+                    value={
+                      row.nature
+                        ? NATURE_OPTS.find((o) => o.value === row.nature)?.label
+                        : undefined
+                    }
+                    options={NATURE_OPTS.map(
+                      (o) => o.label
+                    ) as unknown as readonly string[]}
+                    onChange={(label) => {
+                      const found = NATURE_OPTS.find((o) => o.label === label)?.value;
+                      update({ nature: (found as RptRow["nature"] | undefined) ?? undefined });
+                    }}
+                    allowEmpty
+                  />
                 </div>
 
-                {/* Row B: Currency • Arm’s length? • Independent approval? */}
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-6 lg:grid-cols-12">
-                  <div className="md:col-span-3 lg:col-span-2">
-                    <TextField
-                      label="Currency"
-                      value={row.amount?.currency ?? ""}
-                      onChange={(v) => update({ amount: { ...row.amount, currency: v ?? "" } })}
-                      placeholder="ISO code or symbol"
-                    />
-                  </div>
-
-                  <div className="md:col-span-3 lg:col-span-5">
-                    <SelectField
-                      label="Arm’s length?"
-                      value={row.armsLength}
-                      options={YES_NO as unknown as readonly string[]}
-                      onChange={(v) => update({ armsLength: (v as YesNo) || "yes" })}
-                    />
-                  </div>
-
-                  <div className="md:col-span-3 lg:col-span-5">
-                    <SelectField
-                      label="Independent approval?"
-                      value={row.independentApproval}
-                      options={YES_NO as unknown as readonly string[]}
-                      onChange={(v) => update({ independentApproval: (v as YesNo) || "yes" })}
-                    />
-                  </div>
+                {/* Row B: Amount • Currency • Arm’s length? */}
+                <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+                  <SelectField
+                    label="Currency"
+                    value={row.amount?.currency ? row.amount.currency : undefined}
+                    options={CURRENCY_OPTIONS}
+                    onChange={(v) =>
+                      update({
+                        amount: { ...row.amount, currency: (v as string | undefined) ?? "" },
+                      })
+                    }
+                    allowEmpty
+                  />
+                  <NumberField
+                    label="Amount"
+                    value={amt ?? ""}
+                    min={0}
+                    onChange={(n) => update({ amount: { ...row.amount, value: n ?? null } })}
+                    error={amountNegative ? "Must be ≥ 0" : undefined}
+                  />
+                  <SelectField
+                    label="Arm’s length?"
+                    value={row.armsLength ?? undefined}
+                    options={YES_NO as unknown as readonly string[]}
+                    onChange={(v) => update({ armsLength: (v as YesNo | undefined) ?? undefined })}
+                    allowEmpty
+                  />
                 </div>
 
-                {/* Notes + badges */}
-                <div className="grid grid-cols-1 gap-2">
+                {/* Row C: Independent approval • Notes */}
+                <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+                  <SelectField
+                    label="Independent approval?"
+                    value={row.independentApproval ?? undefined}
+                    options={YES_NO as unknown as readonly string[]}
+                    onChange={(v) =>
+                      update({ independentApproval: (v as YesNo | undefined) ?? undefined })
+                    }
+                    allowEmpty
+                  />
                   <TextField
                     label="Notes (optional)"
                     value={row.notes ?? ""}
                     onChange={(v) => update({ notes: v ?? "" })}
                     placeholder="Short description or reference"
                   />
-                  <div className="flex flex-wrap gap-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
                     {isNonArms ? (
                       <span className="rounded-full border border-red-300 bg-red-50 px-2 py-1 text-red-700">
                         Non–arm’s-length
@@ -268,6 +280,7 @@ export function RelatedPartyTransactionsCard({ value, onChange, readOnly }: Prop
             );
           }}
         />
+
       </div>
 
       {/* Totals / flags */}

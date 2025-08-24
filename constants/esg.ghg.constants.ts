@@ -1,4 +1,5 @@
 // Reusable GHG inventory option sets, maps, and helpers
+import { z } from "zod";
 
 export type Boundary = "Operational control" | "Financial control" | "Equity share";
 export type GWPVersion = "AR5" | "AR6";
@@ -134,3 +135,12 @@ export const UNIT_PRESET_BY_ACTIVITY: Record<string, readonly string[]> = {
 export function presetUnit(activity: string): readonly string[] {
   return UNIT_PRESET_BY_ACTIVITY[activity] || ["kg"];
 }
+
+
+export const GHG_BoundaryEnum = z.enum([
+  "Operational control",
+  "Financial control",
+  "Equity share",
+]);
+
+export type GHGBoundary = z.infer<typeof GHG_BoundaryEnum>;

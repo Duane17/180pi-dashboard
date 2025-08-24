@@ -15,7 +15,8 @@ import { CheckboxWithNumber, MultiSelectChips } from "./ui/controls";
 import { formatNumber } from "@/utils/core-impact";
 import { toKWhFromEnergy } from "@/utils/energy";
 import { safeStringify } from "@/utils/json";
-import { COUNTRIES, QUANTITY_UNITS_ENERGY } from "@/constants/esg.constants";
+import { QUANTITY_UNITS_ENERGY } from "@/constants/esg.constants";
+import { COUNTRIES } from "@/constants/foundational.constants";
 import {
   BOUNDARIES,
   GWP_VERSIONS,
@@ -66,10 +67,12 @@ type Scope2Row = {
 type Meta = {
   boundary?: Boundary;
   baseYear?: number | null;
-  targetYear?: number | null; // must be > baseYear if both present
+  targetYear?: number | null;
   recalcReasons?: RecalcReason[];
   gwpVersion?: GWPVersion;
   efSource?: EFSource;
+    equitySharePct?: number | null;
+
 };
 
 /** ----------------------------------------------------------------
@@ -78,7 +81,7 @@ type Meta = {
 export function GHGInventoryCard({ value, onChange, errors }: Props) {
   // Local meta state (serialized into `notes` for audit trail)
   const [meta, setMeta] = useState<Meta>({
-    gwpVersion: "AR5",
+    gwpVersion: undefined,
     recalcReasons: [],
   });
 
@@ -120,6 +123,27 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
     [s2RowsWithEmissions]
   );
 
+  // Equity-share scaling factor
+  const equityFactor = useMemo(() => {
+    if (meta.boundary === "Equity share") {
+      const pct = meta.equitySharePct ?? 0;
+      // clamp to [0, 100] and convert to 0–1
+      return Math.max(0, Math.min(100, pct)) / 100;
+    }
+    return 1;
+  }, [meta.boundary, meta.equitySharePct]);
+
+  // Scaled totals (what we show & persist)
+  const scope1ScaledTCO2e = useMemo(
+    () => scope1TotalTCO2e * equityFactor,
+    [scope1TotalTCO2e, equityFactor]
+  );
+  const scope2ScaledTCO2e = useMemo(
+    () => scope2TotalTCO2e * equityFactor,
+    [scope2TotalTCO2e, equityFactor]
+  );
+
+
   const yearGuardMsg =
     meta.baseYear && meta.targetYear && meta.targetYear <= meta.baseYear
       ? "Target year must be greater than base year"
@@ -130,21 +154,30 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
     const payload = {
       meta,
       scope1: s1RowsWithEmissions.map(({ tCO2e, ...rest }) => rest),
-      scope1_tCO2e: scope1TotalTCO2e,
+      scope1_tCO2e_raw: scope1TotalTCO2e,
       scope2: s2RowsWithEmissions.map(({ tCO2e, ...rest }) => rest),
-      scope2_tCO2e: scope2TotalTCO2e,
-      // scope3 can be added later
+      scope2_tCO2e_raw: scope2TotalTCO2e,
+      equityFactor,
     };
 
     const notes = safeStringify(payload);
 
     onChange({
-      scope1_tCO2e: scope1TotalTCO2e,
-      scope2_tCO2e: scope2TotalTCO2e,
+      scope1_tCO2e: scope1ScaledTCO2e,
+      scope2_tCO2e: scope2ScaledTCO2e,
       notes,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meta, s1RowsWithEmissions, scope1TotalTCO2e, s2RowsWithEmissions, scope2TotalTCO2e]);
+  }, [
+    meta,
+    s1RowsWithEmissions,
+    scope1TotalTCO2e,
+    s2RowsWithEmissions,
+    scope2TotalTCO2e,
+    equityFactor,
+    scope1ScaledTCO2e,
+    scope2ScaledTCO2e,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -158,7 +191,7 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
 
       {/* Meta */}
       <SectionHeader title="Inventory settings" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SelectField
           label="Boundary"
           value={meta.boundary}
@@ -166,6 +199,14 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
           onChange={(v) => setMeta((m) => ({ ...m, boundary: (v ?? undefined) as Boundary | undefined }))}
           allowEmpty
         />
+        {meta.boundary === "Equity share" && (
+          <NumberField
+            label="Equity share (%)"
+            value={meta.equitySharePct ?? ""}
+            min={0}
+            onChange={(n) => setMeta((m) => ({ ...m, equitySharePct: n ?? null }))}
+        />
+        )}
         <NumberField
           label="Base year"
           value={meta.baseYear ?? ""}
@@ -207,11 +248,12 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
       </div>
       {yearGuardMsg && <p className="text-xs text-red-600">{yearGuardMsg}</p>}
 
+
       <Divider />
 
       {/* Scope 1 */}
       <SectionHeader
-        title="Scope 1 — Direct emissions"
+        title="Scope 1: Direct emissions"
         subtitle="Stationary/mobile combustion, fugitive (refrigerants), process"
       />
       <RowList
@@ -220,10 +262,10 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
           setS1((r) => [
             ...r,
             {
-              category: "stationary",
-              activity: "Diesel",
+              category: undefined as any,
+              activity: undefined as any,
               quantity: null,
-              unit: presetUnit("Diesel")[0],
+              unit: "" as any,
               efKgPerUnit: null,
             },
           ])
@@ -259,17 +301,23 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
         }
         onRemove={(i) => setS1((rows) => rows.filter((_, idx) => idx !== i))}
         render={(row, update) => {
-          const activities = S1_ACTIVITY_BY_CATEGORY[row.category];
-          const units = presetUnit(row.activity);
+          const activities = row.category
+            ? S1_ACTIVITY_BY_CATEGORY[row.category]
+            : ([] as readonly string[]);
+          const units = row.activity ? presetUnit(row.activity) : ([] as readonly string[]);
           const rowWithEmis = s1RowsWithEmissions[s1.indexOf(row)];
           return (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              {/* Inputs grid: 2 rows × 3 cols */}
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+                {/* Row 1 */}
                 <SelectField
                   label="Category"
                   value={row.category}
                   options={["stationary", "mobile", "fugitive", "process"] as const}
-                  onChange={(v) => update({ category: (v as Scope1Category) || "stationary" })}
+                  onChange={(v) =>
+                    update({ category: (v as Scope1Category) || "stationary" })
+                  }
                 />
                 <SelectField
                   label="Activity type"
@@ -283,6 +331,8 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
                   min={0}
                   onChange={(n) => update({ quantity: n })}
                 />
+
+                {/* Row 2 */}
                 <SelectField
                   label="Unit"
                   value={row.unit}
@@ -300,34 +350,39 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
                     label="Refrigerant"
                     value={
                       row.refrigerant ??
-                      (REFRIGERANTS.includes(row.activity as any) ? (row.activity as any) : "")
+                      (REFRIGERANTS.includes(row.activity as any)
+                        ? (row.activity as any)
+                        : "")
                     }
                     options={REFRIGERANTS}
                     onChange={(v) => update({ refrigerant: v as string })}
                     allowEmpty
                   />
                 ) : (
-                  <div />
+                  <div /> // filler for alignment
                 )}
               </div>
+
               <div className="text-xs text-gray-600">
-                Row emissions: <strong>{formatNumber(rowWithEmis?.tCO2e ?? 0)} tCO₂e</strong>
+                Row emissions:{" "}
+                <strong>{formatNumber(rowWithEmis?.tCO2e ?? 0)} tCO₂e</strong>
               </div>
             </>
           );
         }}
       />
 
+
       <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <span className="text-gray-700">Scope 1 total:&nbsp;</span>
-        <strong className="text-gray-900">{formatNumber(scope1TotalTCO2e)} tCO₂e</strong>
+        <strong className="text-gray-900">{formatNumber(scope1ScaledTCO2e)} tCO₂e</strong>
       </div>
 
       <Divider />
 
       {/* Scope 2 */}
       <SectionHeader
-        title="Scope 2 — Purchased energy"
+        title="Scope 2: Purchased energy"
         subtitle="Electricity, district heat, steam, cooling"
       />
       <RowList
@@ -336,13 +391,17 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
           setS2((r) => [
             ...r,
             {
-              energyType: "Electricity",
+              energyType: undefined as any,
               quantity: null,
-              unit: "kWh",
+              unit: "" as any,
               country: undefined,
               supplierName: undefined,
               supplierEF_kgCO2e_per_kWh: null,
-              contracts: { eac: { has: false }, ppa: { has: false }, greenTariff: { has: false } },
+              contracts: {
+                eac: { has: false },
+                ppa: { has: false },
+                greenTariff: { has: false },
+              },
             },
           ])
         }
@@ -364,12 +423,18 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
           const countryOptions = COUNTRIES.map((c) => c.label) as readonly string[];
           return (
             <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              {/* Inputs grid: 2 rows × 3 cols */}
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
+                {/* Row 1 */}
                 <SelectField
                   label="Energy type"
                   value={row.energyType}
                   options={["Electricity", "District heat", "Steam", "Cooling"] as const}
-                  onChange={(v) => update({ energyType: (v as Scope2Row["energyType"]) || "Electricity" })}
+                  onChange={(v) =>
+                    update({
+                      energyType: (v as Scope2Row["energyType"]) || "Electricity",
+                    })
+                  }
                 />
                 <NumberField
                   label="Quantity"
@@ -381,8 +446,12 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
                   label="Unit"
                   value={row.unit}
                   options={QUANTITY_UNITS_ENERGY}
-                  onChange={(v) => update({ unit: (v as Scope2Row["unit"]) || "kWh" })}
+                  onChange={(v) =>
+                    update({ unit: (v as Scope2Row["unit"]) || "kWh" })
+                  }
                 />
+
+                {/* Row 2 */}
                 <SelectField
                   label="Country/Region"
                   value={row.country ?? ""}
@@ -404,7 +473,7 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
                 />
               </div>
 
-              {/* Contracts area: vertically stacked controls */}
+              {/* Contracts area */}
               <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="rounded-xl border border-gray-200/70 bg-white/60 p-4 backdrop-blur-sm">
                   <CheckboxWithNumber
@@ -414,10 +483,7 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
                     volume={row.contracts?.eac?.volumeKWh ?? null}
                     onChange={(has, volumeKWh) =>
                       update({
-                        contracts: {
-                          ...row.contracts,
-                          eac: { has, volumeKWh },
-                        },
+                        contracts: { ...row.contracts, eac: { has, volumeKWh } },
                       })
                     }
                   />
@@ -430,10 +496,7 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
                     volume={row.contracts?.ppa?.volumeKWh ?? null}
                     onChange={(has, volumeKWh) =>
                       update({
-                        contracts: {
-                          ...row.contracts,
-                          ppa: { has, volumeKWh },
-                        },
+                        contracts: { ...row.contracts, ppa: { has, volumeKWh } },
                       })
                     }
                   />
@@ -457,16 +520,18 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
               </div>
 
               <div className="text-xs text-gray-600 mt-2">
-                Row emissions: <strong>{formatNumber(rowWithEmis?.tCO2e ?? 0)} tCO₂e</strong>
+                Row emissions:{" "}
+                <strong>{formatNumber(rowWithEmis?.tCO2e ?? 0)} tCO₂e</strong>
               </div>
             </>
           );
         }}
       />
 
+
       <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <span className="text-gray-700">Scope 2 total:&nbsp;</span>
-        <strong className="text-gray-900">{formatNumber(scope2TotalTCO2e)} tCO₂e</strong>
+        <strong className="text-gray-900">{formatNumber(scope2ScaledTCO2e)} tCO₂e</strong>
       </div>
 
       <Divider />
@@ -475,7 +540,7 @@ export function GHGInventoryCard({ value, onChange, errors }: Props) {
       <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-sm shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <span className="text-gray-700">All included (S1 + S2):&nbsp;</span>
         <strong className="text-gray-900">
-          {formatNumber(scope1TotalTCO2e + scope2TotalTCO2e)} tCO₂e
+            {formatNumber(scope1ScaledTCO2e + scope2ScaledTCO2e)} tCO₂e
         </strong>
       </div>
     </div>

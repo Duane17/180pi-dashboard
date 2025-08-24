@@ -194,7 +194,7 @@ export function FoundationalForm({ onSubmit, onCancel }: FoundationalFormProps) 
             Foundational Information
           </h2>
           <p className="mt-1 text-sm text-gray-700">
-            Capture your company’s foundational details. We’ll wire uploads and APIs next.
+            Capture your company’s foundational details.
           </p>
         </div>
 

@@ -162,6 +162,12 @@ export function EnvironmentStep() {
         </p>
       </div>
 
+
+      {/* GHG inventory */}
+      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+        <GHGInventoryCard value={env.ghg} onChange={onChangeGHG} errors={ghgErrors} />
+      </div>
+      
       {/* Resource consumption */}
       <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <ResourceConsumptionCard
@@ -169,11 +175,6 @@ export function EnvironmentStep() {
           onChange={onChangeRC}
           errors={rcErrors}
         />
-      </div>
-
-      {/* GHG inventory */}
-      <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
-        <GHGInventoryCard value={env.ghg} onChange={onChangeGHG} errors={ghgErrors} />
       </div>
 
       {/* Water flows */}

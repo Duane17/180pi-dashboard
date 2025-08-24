@@ -16,27 +16,27 @@ import { Chip } from "../social/ui/chip";
 export type DirectorRow = {
   id?: string;
   fullName: string;
-  role: "chair" | "member" | "vice_chair" | "executive" | "non_executive";
-  independence: "independent" | "non-independent";
-  gender?: "woman" | "man" | "undisclosed";
-  ageBand?: "<30" | "30–50" | ">50";
+  role?: "chair" | "member" | "vice_chair" | "executive" | "non_executive";          // ⬅ allow empty
+  independence?: "independent" | "non-independent";                                   // ⬅ allow empty
+  gender?: "woman" | "man" | "undisclosed";                                            // already optional
+  ageBand?: "<30" | "30–50" | ">50";                                                   // already optional
   nationality?: string;
   tenureYears?: number | null;
   appointedAt?: string; // ISO text
-  committees?: Array<"audit" | "remuneration" | "nomination" | "esg">;
-  meetingsHeld?: number | null;     // optional per-director override
-  meetingsAttended?: number | null; // optional per-director
+  committees?: Array<"audit" | "remuneration" | "nomination" | "esg">;                 // ⬅ allow empty
+  meetingsHeld?: number | null;
+  meetingsAttended?: number | null;
 };
 
 export type BoardEvaluationValue = {
-  conducted: "yes" | "no";
+  conducted?: "yes" | "no";                                                            // ⬅ allow empty
   type?: "internal" | "external";
   date?: string;
 };
 
 export type GovernanceBodyValue = {
   highestBodyName: string;
-  chairCeoRoles: "separate" | "combined";
+  chairCeoRoles?: "separate" | "combined";                                             // ⬅ allow empty
   directors: DirectorRow[];
   meetingsHeldTotal?: number | null;
   boardEvaluation?: BoardEvaluationValue;
@@ -58,8 +58,14 @@ const CHAIRSPLIT = ["separate", "combined"] as const;
 const COMMITTEES = ["audit", "remuneration", "nomination", "esg"] as const;
 
 function toNum(n: unknown) {
+  if (n == null) return 0;
   const v = typeof n === "number" ? n : Number(n);
   return Number.isFinite(v) ? v : 0;
+}
+function toNumOrNull(n: unknown) {
+  if (n == null) return null;
+  const v = Number(n);
+  return Number.isFinite(v) ? v : null;
 }
 function fmtPct(n: number | null) {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -104,19 +110,20 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
   const tenureNumbers = useMemo(
     () =>
       directors
-        .map((d) => (d.tenureYears == null ? null : Number(d.tenureYears)))
-        .filter((n): n is number => Number.isFinite(n) && n! >= 0),
+        .map((d) => toNumOrNull(d.tenureYears))
+        .filter((n): n is number => Number.isFinite(n as number) && (n as number) >= 0),
     [directors]
   );
   const tenureAvg = mean(tenureNumbers);
   const tenureMed = median(tenureNumbers);
 
-  // Attendance overall: per director use their held if present, else meetingsHeldTotal
+  // Attendance overall
   const attendanceOverallPct = useMemo(() => {
     let sumHeld = 0;
     let sumAtt = 0;
     directors.forEach((d) => {
-      const held = d.meetingsHeld != null ? toNum(d.meetingsHeld) : toNum(totalMeetings);
+      const held =
+        d.meetingsHeld != null ? toNum(d.meetingsHeld) : toNum(totalMeetings);
       const att = d.meetingsAttended != null ? toNum(d.meetingsAttended) : 0;
       if (held > 0) {
         sumHeld += held;
@@ -148,14 +155,15 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
         {
           id: uid(),
           fullName: "",
-          role: "member",
-          independence: "non-independent",
-          gender: "undisclosed",
+          // ⬇️ start all selects empty (undefined)
+          role: undefined,
+          independence: undefined,
+          gender: undefined,
           ageBand: undefined,
           nationality: "",
           tenureYears: null,
           appointedAt: "",
-          committees: [],
+          committees: undefined, // empty means no chips checked yet
           meetingsHeld: null,
           meetingsAttended: null,
         },
@@ -174,17 +182,17 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
   };
 
   /* -------- Evaluation helpers -------- */
-  const evalVal = value.boardEvaluation ?? { conducted: "no" as const };
+  const evalVal: BoardEvaluationValue = value.boardEvaluation ?? {};
   const evalNeedsType = evalVal.conducted === "yes" && !evalVal.type;
   const evalNeedsDate = evalVal.conducted === "yes" && !evalVal.date?.trim();
 
   /* -------- Simple per-row validation flags -------- */
   const rowAttnHint = (row: DirectorRow): string | undefined => {
-    const held = row.meetingsHeld != null ? toNum(row.meetingsHeld) : toNum(totalMeetings);
+    const held =
+      row.meetingsHeld != null ? toNum(row.meetingsHeld) : toNum(totalMeetings);
     const att = row.meetingsAttended != null ? toNum(row.meetingsAttended) : 0;
     if (held > 0 && att > held) return "Attended cannot exceed Held";
     return undefined;
-    // (hard validation lives in Zod; this is just UX)
   };
 
   /* ============================ Render ============================ */
@@ -201,7 +209,7 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
         </p>
       </div>
 
-      {/* Highest body + chair/CEO roles + meetings total */}
+      {/* Body info */}
       <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <SectionHeader title="Body & period" />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -213,13 +221,14 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
           />
           <SelectField
             label="Chair & CEO roles"
-            value={value.chairCeoRoles}
+            value={value.chairCeoRoles ?? undefined}        // ⬅ empty when undefined
             options={CHAIRSPLIT as unknown as readonly string[]}
             onChange={(v) =>
               onChange({
-                chairCeoRoles: (v as "separate" | "combined") || "separate",
+                chairCeoRoles: (v as "separate" | "combined" | undefined) ?? undefined,
               })
             }
+            allowEmpty                                         // ⬅ allow clearing
           />
           <NumberField
             label="Meetings held (period)"
@@ -245,11 +254,13 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
               const next = new Set(committees);
               if (on) next.add(key);
               else next.delete(key);
-              update({ committees: Array.from(next) as DirectorRow["committees"] });
+              // ⬇️ if empty, set undefined (keeps “no committees selected” truly empty)
+              const arr = Array.from(next) as DirectorRow["committees"];
+              update({ committees: arr!.length ? arr! : undefined });
             };
 
             return (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-3 lg:grid-cols-3">
                 <TextField
                   label="Full name"
                   value={row.fullName}
@@ -257,34 +268,35 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
                 />
                 <SelectField
                   label="Role"
-                  value={row.role}
+                  value={row.role ?? undefined}
                   options={ROLES as unknown as readonly string[]}
-                  onChange={(v) => update({ role: (v as DirectorRow["role"]) || "member" })}
+                  onChange={(v) => update({ role: (v as DirectorRow["role"] | undefined) ?? undefined })}
+                  allowEmpty
                 />
                 <SelectField
                   label="Independence"
-                  value={row.independence}
+                  value={row.independence ?? undefined}
                   options={INDEP as unknown as readonly string[]}
                   onChange={(v) =>
                     update({
-                      independence:
-                        (v as DirectorRow["independence"]) || "non-independent",
+                      independence: (v as DirectorRow["independence"] | undefined) ?? undefined,
                     })
                   }
+                  allowEmpty
                 />
                 <SelectField
                   label="Gender"
-                  value={row.gender ?? "undisclosed"}
+                  value={row.gender ?? undefined}
                   options={GENDER as unknown as readonly string[]}
-                  onChange={(v) =>
-                    update({ gender: (v as DirectorRow["gender"]) || "undisclosed" })
-                  }
+                  onChange={(v) => update({ gender: (v as DirectorRow["gender"] | undefined) ?? undefined })}
+                  allowEmpty
                 />
                 <SelectField
                   label="Age band"
-                  value={row.ageBand ?? ""}
+                  value={row.ageBand ?? undefined}
                   options={AGE as unknown as readonly string[]}
-                  onChange={(v) => update({ ageBand: (v as DirectorRow["ageBand"]) || undefined })}
+                  onChange={(v) => update({ ageBand: (v as DirectorRow["ageBand"] | undefined) ?? undefined })}
+                  allowEmpty
                 />
                 <TextField
                   label="Nationality (optional)"
@@ -306,27 +318,33 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
                 />
 
                 {/* Committees checkboxes */}
-                <div className="sm:col-span-3">
+                <div className="lg:col-span-3">
                   <div className="text-xs text-gray-700 mb-1">Committees</div>
                   <div className="flex flex-wrap gap-3">
                     {COMMITTEES.map((c) => {
                       const checked = committees.has(c);
+                      const label =
+                        c === "esg"
+                          ? "ESG/Sustainability"
+                          : c.charAt(0).toUpperCase() + c.slice(1);
                       return (
-                        <label key={c} className="inline-flex items-center gap-2 text-sm text-gray-800">
+                        <label
+                          key={c}
+                          className="inline-flex items-center gap-2 text-sm text-gray-800"
+                        >
                           <input
                             type="checkbox"
                             className="h-4 w-4"
                             checked={checked}
                             onChange={(e) => setCommittee(c, e.target.checked)}
                           />
-                          {c}
+                          {label}
                         </label>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* Meetings per-director */}
                 <NumberField
                   label="Meetings held (dir.)"
                   value={row.meetingsHeld ?? ""}
@@ -343,16 +361,23 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
                 />
 
                 {/* Row chips */}
-                <div className="sm:col-span-2 flex items-end">
+                <div className="lg:col-span-2 flex items-end">
                   <div className="w-full rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
                     <div className="flex flex-wrap gap-2">
-                      <Chip label="Indep." value={row.independence === "independent" ? "Yes" : "No"} />
+                      <Chip
+                        label="Independent"
+                        value={row.independence === "independent" ? "Yes" : row.independence === "non-independent" ? "No" : "—"}
+                      />
                       <Chip label="Gender" value={row.gender ?? "—"} />
-                      <Chip label="Committees" value={(row.committees ?? []).length.toString()} />
+                      <Chip
+                        label="Committees"
+                        value={String((row.committees ?? []).length)}
+                      />
                     </div>
                   </div>
                 </div>
               </div>
+
             );
           }}
         />
@@ -364,31 +389,33 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <SelectField
             label="Conducted?"
-            value={evalVal.conducted}
+            value={evalVal.conducted ?? undefined}                 // ⬅ empty until chosen
             options={["yes", "no"]}
             onChange={(v) =>
               onChange({
                 boardEvaluation: {
-                  conducted: (v as "yes" | "no") || "no",
+                  conducted: (v as "yes" | "no" | undefined) ?? undefined,
                   type: evalVal.type,
                   date: evalVal.date,
                 },
               })
             }
+            allowEmpty
           />
           <SelectField
             label="Type"
-            value={evalVal.type ?? ""}
+            value={evalVal.type ?? undefined}                      // ⬅ empty until chosen
             options={["internal", "external"]}
             onChange={(v) =>
               onChange({
                 boardEvaluation: {
                   conducted: evalVal.conducted,
-                  type: (v as "internal" | "external") || undefined,
+                  type: (v as "internal" | "external" | undefined) ?? undefined,
                   date: evalVal.date,
                 },
               })
             }
+            allowEmpty
           />
           <TextField
             label="Date (ISO)"
@@ -425,14 +452,18 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
           <Chip label="Audit" value={committeeCoverage.audit ? "✓" : "—"} />
           <Chip label="Remuneration" value={committeeCoverage.remuneration ? "✓" : "—"} />
           <Chip label="Nomination" value={committeeCoverage.nomination ? "✓" : "—"} />
-          <Chip label="ESG" value={committeeCoverage.esg ? "✓" : "—"} />
+          <Chip
+            label="ESG/Sustainability"
+            value={committeeCoverage.esg ? "✓" : "—"}
+          />
         </div>
       </div>
 
       <Divider />
       <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <span className="text-gray-700">
-          <u>Attendance</u>: uses director-level “held” if provided, else the period total. Computed as Σ attended ÷ Σ held × 100.
+          <u>Attendance</u>: uses director-level “held” if provided, else the period total.
+          Computed as Σ attended ÷ Σ held × 100.
         </span>
       </div>
     </div>

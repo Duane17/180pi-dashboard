@@ -18,11 +18,11 @@ export type CommitteeKey = "audit" | "remuneration" | "nomination" | "esg";
 export type AttendanceRow = {
   directorId: string;
   attended: number | null;
-  held?: number | null; // falls back to committee.meetingsHeld
+  held?: number | null;
 };
 
 export type OneCommitteeValue = {
-  exists: boolean;
+  exists?: boolean;
   chairId?: string;
   memberIds?: string[];
   independenceMajority?: "yes" | "no" | null;
@@ -38,7 +38,7 @@ export type DirectorMini = { id: string; name: string; independence?: "independe
 type Props = {
   value: CommitteesValue;
   onChange: (patch: Partial<CommitteesValue>) => void;
-  directors: DirectorMini[]; // from governance.body.directors
+  directors: DirectorMini[];
   readOnly?: boolean;
 };
 
@@ -56,13 +56,10 @@ function fmtPct(n: number | null) {
   if (n == null || !Number.isFinite(n)) return "—";
   return `${n.toFixed(1)}%`;
 }
-
-/** Build select options & maps: labels are stable as "Name — id••••" to avoid pure-name ambiguity */
 function buildDirectorLabel(d: DirectorMini) {
   const suffix = d.id?.slice(-4) ?? "????";
-  return `${d.name || "(unnamed)"} — id•${suffix}`;
+  return `${d.name || "(unnamed)"}`;
 }
-
 function makeDirectorMaps(directors: DirectorMini[]) {
   const labelById = new Map<string, string>();
   const idByLabel = new Map<string, string>();
@@ -73,8 +70,6 @@ function makeDirectorMaps(directors: DirectorMini[]) {
   });
   return { labelById, idByLabel, options: Array.from(idByLabel.keys()) as readonly string[] };
 }
-
-/** Overall attendance % for a committee using attendance rows */
 function computeAttendancePct(rows: AttendanceRow[] | undefined, fallbackHeld: number | null | undefined) {
   if (!rows?.length) return null;
   let sumHeld = 0;
@@ -107,33 +102,43 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
     onChange(next);
   };
 
-  const toggleExists = (key: CommitteeKey, exists: boolean) => {
-    if (!exists) {
-      // When turning off, keep the object but blank optional fields
+  const toggleExists = (key: CommitteeKey, exists: boolean | undefined) => {
+    if (exists === false) {
       patchCommittee(key, {
         exists: false,
         chairId: undefined,
-        memberIds: [],
+        memberIds: undefined,
         independenceMajority: null,
         responsibilities: "",
         meetingsHeld: null,
         attendance: [],
       });
-    } else {
+    } else if (exists === true) {
       patchCommittee(key, { exists: true });
+    } else {
+      patchCommittee(key, {
+        exists: undefined,
+        chairId: undefined,
+        memberIds: undefined,
+        independenceMajority: null,
+        responsibilities: "",
+        meetingsHeld: null,
+        attendance: [],
+      });
     }
   };
 
   const renderCommittee = (key: CommitteeKey, title: string) => {
-    const c = value[key] ?? { exists: false } as OneCommitteeValue;
+    const c = (value[key] ?? {}) as OneCommitteeValue;
     const members = new Set(c.memberIds ?? []);
     const attendance = c.attendance ?? [];
 
-    // Derived
     const overallPct = computeAttendancePct(attendance, c.meetingsHeld);
     const hasChair = !!c.chairId;
     const hasMembers = (c.memberIds?.length ?? 0) > 0;
-    const softHint = c.exists && (!hasChair || !hasMembers);
+    const softHint = c.exists === true && (!hasChair || !hasMembers);
+
+    const existsValue = c.exists === undefined ? "" : c.exists ? "yes" : "no";
 
     return (
       <details className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40" open>
@@ -141,7 +146,7 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h4 className="font-medium text-gray-900">{title}</h4>
             <div className="flex flex-wrap gap-2 text-xs">
-              <Chip label="Exists" value={c.exists ? "Yes" : "No"} />
+              <Chip label="Exists" value={c.exists === undefined ? "—" : c.exists ? "Yes" : "No"} />
               <Chip label="Attendance" value={fmtPct(overallPct)} />
               <Chip label="Indep. majority" value={c.independenceMajority ?? "—"} />
             </div>
@@ -151,22 +156,26 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
         <div className="mt-4 space-y-4">
           <SectionHeader title="Status & basics" />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {/* Exists toggle via SelectField yes/no to keep UI primitives simple */}
             <SelectField
               label="Committee exists?"
-              value={c.exists ? "yes" : "no"}
-              options={["yes", "no"]}
-              onChange={(v) => toggleExists(key, v === "yes")}
+              value={existsValue as any}
+              options={YES_NO_NULL as unknown as readonly string[]}
+              onChange={(v) => {
+                const val = (v as "" | "yes" | "no");
+                toggleExists(key, val === "" ? undefined : val === "yes");
+              }}
+              allowEmpty
             />
             <SelectField
               label="Independence majority"
-              value={(c.independenceMajority ?? "") as any}
-              options={YES_NO_NULL as unknown as readonly string[]}
+              value={(c.independenceMajority ?? undefined) as any}
+              options={["yes", "no"] as const as unknown as readonly string[]}
               onChange={(v) =>
                 patchCommittee(key, {
-                  independenceMajority: (v as "yes" | "no") || null,
+                  independenceMajority: (v as "yes" | "no" | undefined) ?? null,
                 })
               }
+              allowEmpty
             />
             <NumberField
               label="Meetings held (period)"
@@ -180,13 +189,13 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <SelectField
               label="Chair (director)"
-              value={c.chairId ? (labelById.get(c.chairId) ?? "") : ""}
+              value={c.chairId ? (labelById.get(c.chairId) ?? undefined) : undefined}
               options={options}
               onChange={(label) =>
                 patchCommittee(key, { chairId: label ? idByLabel.get(label as string) : undefined })
               }
+              allowEmpty
             />
-            {/* Members as a grid of checkboxes (uses the same label mapping) */}
             <div className="sm:col-span-2">
               <div className="text-xs text-gray-700 mb-1">Members</div>
               <div className="flex flex-wrap gap-3">
@@ -204,7 +213,8 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
                           const next = new Set(members);
                           if (e.target.checked) next.add(id);
                           else next.delete(id);
-                          patchCommittee(key, { memberIds: Array.from(next) });
+                          const arr = Array.from(next);
+                          patchCommittee(key, { memberIds: arr.length ? arr : undefined });
                         }}
                       />
                       {label}
@@ -248,14 +258,13 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
             onRemove={(i) => {
               const next = attendance.slice();
               next.splice(i, 1);
-              patchCommittee(key, { attendance: next });
+              patchCommittee(key, { attendance: next.length ? next : [] });
             }}
             onUpdate={(i, patch) => {
               const next = attendance.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
               patchCommittee(key, { attendance: next });
             }}
             render={(row, update) => {
-              // Validate attended ≤ held (with fallback)
               const heldEff =
                 row.held != null && Number.isFinite(Number(row.held))
                   ? toNum(row.held)
@@ -268,11 +277,12 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                   <SelectField
                     label="Director"
-                    value={labelById.get(row.directorId) ?? ""}
+                    value={labelById.get(row.directorId) ?? undefined}
                     options={options}
                     onChange={(label) =>
                       update({ directorId: label ? (idByLabel.get(label as string) ?? "") : "" })
                     }
+                    allowEmpty
                   />
                   <NumberField
                     label="Attended"
@@ -292,7 +302,7 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
                       <Chip
                         label="Row %"
                         value={fmtPct(
-                          heldEff > 0 ? Math.min(att, heldEff) / heldEff * 100 : null
+                          heldEff > 0 ? (Math.min(att, heldEff) / heldEff) * 100 : null
                         )}
                       />
                       {hint ? (
@@ -305,7 +315,6 @@ export function CommitteesCard({ value, onChange, directors }: Props) {
             }}
           />
 
-          {/* Footer chips */}
           <div className="rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
             <div className="flex flex-wrap gap-2">
               <Chip label="Overall attendance" value={fmtPct(overallPct)} />

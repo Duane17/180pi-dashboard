@@ -10,10 +10,17 @@ import {
   Divider,
 } from "@/components/upload/env/ui";
 import { Chip } from "../social/ui/chip";
+import { CURRENCIES } from "@/constants/foundational.constants";
 
 /* ============================== Types ============================== */
 
 export type YesNo = "yes" | "no";
+
+type CurrencyLike = string | { value?: string; code?: string; label?: string; name?: string };
+
+const CURRENCY_OPTIONS: readonly string[] = (CURRENCIES as unknown as CurrencyLike[])
+  .map((c) => (typeof c === "string" ? c : c.value ?? c.code ?? ""))
+  .filter((s): s is string => !!s);
 
 /** Backend persists only url; the rest are UI-only (kept out of Zod). */
 export type ExecPolicy = {
@@ -40,13 +47,13 @@ export type EsgMetricRow = {
 
 export type Money = {
   amount: number | null;
-  currency: string;
+  currency?: string;
 };
 
 export type ExecutiveRemunerationValue = {
   policy?: ExecPolicy;
   payElements?: PayElements;
-  esgLinked: YesNo;
+  esgLinked?: YesNo;
   esgMetrics?: EsgMetricRow[];
   ceoPay?: Money;
   medianEmployeePay?: Money;
@@ -88,8 +95,8 @@ export function ExecutiveRemunerationCard({ value, onChange, readOnly }: Props) 
   const policyPersisted = value.policy ?? { url: "" };
   const elements = value.payElements ?? { fixed: false, annualBonus: false, lti: false };
   const metrics = value.esgMetrics ?? [];
-  const ceo = value.ceoPay ?? { amount: null, currency: "" };
-  const med = value.medianEmployeePay ?? { amount: null, currency: "" };
+  const ceo = value.ceoPay ?? { amount: null, currency: undefined };
+  const med = value.medianEmployeePay ?? { amount: null, currency: undefined };
 
   // Local-only state for upload metadata (prevents Zod from stripping it)
   const [policyUI, setPolicyUI] = useState<ExecPolicy>({});
@@ -381,32 +388,35 @@ export function ExecutiveRemunerationCard({ value, onChange, readOnly }: Props) 
         <SectionHeader title="CEO & Median employee pay" />
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <SelectField
+              label="Currency"
+              value={ceo.currency ?? undefined}
+              options={CURRENCY_OPTIONS}
+              onChange={(v) => patchCeo({ currency: (v as string | undefined) ?? undefined })}
+              allowEmpty
+            />
+
             <NumberField
               label="CEO total pay (amount)"
               value={ceo.amount ?? ""}
               min={0}
               onChange={(n) => patchCeo({ amount: n ?? null })}
             />
-            <TextField
-              label="Currency"
-              value={ceo.currency ?? ""}
-              onChange={(v) => patchCeo({ currency: v ?? "" })}
-              placeholder="ISO code or symbol"
-            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <SelectField
+              label="Currency"
+              value={med.currency ?? undefined}
+              options={CURRENCY_OPTIONS}
+              onChange={(v) => patchMedian({ currency: (v as string | undefined) ?? undefined })}
+              allowEmpty
+            />
             <NumberField
               label="Median employee pay (amount)"
               value={med.amount ?? ""}
               min={0}
               onChange={(n) => patchMedian({ amount: n ?? null })}
-            />
-            <TextField
-              label="Currency"
-              value={med.currency ?? ""}
-              onChange={(v) => patchMedian({ currency: v ?? "" })}
-              placeholder="ISO code or symbol"
             />
           </div>
         </div>

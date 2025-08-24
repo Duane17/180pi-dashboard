@@ -5,11 +5,11 @@ import {
   SectionHeader,
   RowList,
   NumberField,
-  TextField,
   SelectField,
   Divider,
+  TextField,
 } from "@/components/upload/env/ui";
-import { COUNTRIES } from "@/constants/esg.constants";
+import { COUNTRIES, CURRENCIES } from "@/constants/foundational.constants";
 
 /** --------------------------- Types (aligned to schema) --------------------------- */
 export type PayValue = {
@@ -107,15 +107,14 @@ export function PayCard({ value, onChange, readOnly }: Props) {
           min={0}
           onChange={(n) => patchRate({ amount: n ?? null })}
         />
-        <TextField
+        <SelectField
           label="Currency"
           value={rate.currency ?? ""}
+          options={CURRENCIES.map((c) => c.label) as readonly string[]}
           onChange={(v) => {
-            // keep short codes/symbols; schema enforces length
-            const next = (v || "").slice(0, 8);
-            patchRate({ currency: next });
+            patchRate({ currency: v || "" });
           }}
-          placeholder="e.g., MWK, USD"
+          allowEmpty
         />
       </div>
 
@@ -150,48 +149,46 @@ export function PayCard({ value, onChange, readOnly }: Props) {
           const gap = calcGapPct(row.avgWomen, row.avgMen);
 
           return (
-            <>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                <TextField
-                  label="Employee group"
-                  value={row.group}
-                  onChange={(v) => update({ group: v })}
-                  placeholder="e.g., Management"
-                />
-                <SelectField
-                  label="Country"
-                  value={row.country}
-                  options={COUNTRIES.map((c) => c.label) as readonly string[]}
-                  onChange={(v) => update({ country: v })}
-                  allowEmpty
-                />
-                <NumberField
-                  label="Avg women salary"
-                  value={row.avgWomen ?? ""}
-                  min={0}
-                  onChange={(n) => update({ avgWomen: n ?? null })}
-                />
-                <NumberField
-                  label="Avg men salary"
-                  value={row.avgMen ?? ""}
-                  min={0}
-                  onChange={(n) => update({ avgMen: n ?? null })}
-                />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+              <TextField
+                label="Employee group"
+                value={row.group}
+                onChange={(v) => update({ group: v })}
+                placeholder="e.g., Management"
+              />
+              <SelectField
+                label="Country"
+                value={row.country}
+                options={COUNTRIES.map((c) => c.label) as readonly string[]}
+                onChange={(v) => update({ country: v })}
+                allowEmpty
+              />
+              <NumberField
+                label="Avg women salary"
+                value={row.avgWomen ?? ""}
+                min={0}
+                onChange={(n) => update({ avgWomen: n ?? null })}
+              />
+              <NumberField
+                label="Avg men salary"
+                value={row.avgMen ?? ""}
+                min={0}
+                onChange={(n) => update({ avgMen: n ?? null })}
+              />
 
-                {/* Derived, read-only mini-panels */}
-                <div className="sm:col-span-1 lg:col-span-2 flex items-end">
-                  <div className="w-full rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
-                    <div className="flex flex-wrap gap-2">
-                      <MetricChip label="Women/Men ratio" value={ratio == null ? "—" : fmt(ratio, 3)} />
-                      <MetricChip
-                        label="Pay gap"
-                        value={gap == null ? "—" : `${fmt(gap, 1)}%`}
-                      />
-                    </div>
+              {/* Derived, read-only mini-panels */}
+              <div className="sm:col-span-1 lg:col-span-2 flex items-end">
+                <div className="w-full rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
+                  <div className="flex flex-wrap gap-2">
+                    <MetricChip label="Women/Men ratio" value={ratio == null ? "—" : fmt(ratio, 3)} />
+                    <MetricChip
+                      label="Pay gap"
+                      value={gap == null ? "—" : `${fmt(gap, 1)}%`}
+                    />
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           );
         }}
       />
@@ -199,9 +196,7 @@ export function PayCard({ value, onChange, readOnly }: Props) {
   );
 }
 
-/** Small reusable “chip” for derived metrics.
- *  (Optionally move to a shared location and import everywhere.)
- */
+/** Small reusable “chip” for derived metrics. */
 function MetricChip({ label, value }: { label: string; value: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-full border border-gray-300/70 bg-white/70 px-2 py-1 text-[11px] text-gray-800">

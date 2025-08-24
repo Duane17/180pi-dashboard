@@ -55,6 +55,7 @@ import {
   type MaterialityValue,
   type YesNoPlanned,
   type StakeholderKey,
+  type Assessment
 } from "@/components/upload/governance/materiality-stakeholder-card";
 
 import {
@@ -84,124 +85,150 @@ export function GovernanceStep() {
 
   // ---------- Normalizers ----------
   const ownershipValue = useMemo<OwnershipLegalValue>(() => {
-    const src = gov?.ownership;
+  const src = gov?.ownership;
 
-    return {
-      ultimateParent: {
-        name: src?.ultimateParent?.name ?? "",
-        status: (src?.ultimateParent?.status as "named" | "independent") ?? "named",
-      },
-      topShareholders: Array.isArray(src?.topShareholders)
-        ? src!.topShareholders.map((r) => ({
-            id: r?.id ?? undefined,
-            name: r?.name ?? "",
-            pct:
-              r?.pct == null
-                ? null
-                : Number.isFinite(Number(r.pct))
-                ? Number(r.pct)
-                : null,
-          }))
-        : [],
-      isListedEquity: !!src?.isListedEquity,
-      shareClasses: src?.shareClasses
-        ? {
-            structure:
-              (src.shareClasses.structure as "ordinary" | "dual_class") ??
-              "ordinary",
-            classes: (src.shareClasses.classes ?? []).map((c) => ({
-              name: c?.name ?? "",
-              votingRightsPerShare:
-                c?.votingRightsPerShare == null
-                  ? null
-                  : Number.isFinite(Number(c.votingRightsPerShare))
-                  ? Number(c.votingRightsPerShare)
-                  : null,
-              notes: c?.notes ?? "",
-            })),
-            dualClassNotes: src.shareClasses.dualClassNotes ?? "",
-          }
-        : { structure: "ordinary", classes: [] },
-      controlFeatures: src?.controlFeatures
-        ? {
-            hasControlFeatures: !!src.controlFeatures.hasControlFeatures,
-            description: src.controlFeatures.description ?? "",
-          }
-        : { hasControlFeatures: false, description: "" },
+  // Build shareClasses only if structure is present and valid
+  let shareClasses: OwnershipLegalValue["shareClasses"] = undefined;
+  const rawSC = src?.shareClasses;
+  const scStructure = rawSC?.structure as "ordinary" | "dual_class" | undefined;
+
+  if (scStructure) {
+    shareClasses = {
+      structure: scStructure, // now guaranteed to be valid
+      classes: (rawSC?.classes ?? []).map((c) => ({
+        name: c?.name ?? "",
+        votingRightsPerShare:
+          c?.votingRightsPerShare == null
+            ? null
+            : Number.isFinite(Number(c.votingRightsPerShare))
+            ? Number(c.votingRightsPerShare)
+            : null,
+        notes: c?.notes ?? "",
+      })),
+      dualClassNotes: rawSC?.dualClassNotes ?? "",
     };
-  }, [gov?.ownership]);
+  } // else keep shareClasses undefined so the select is unselected
+
+  // Build controlFeatures only if present; don't inject defaults
+  const cf = src?.controlFeatures;
+  const controlFeatures =
+    cf == null
+      ? undefined
+      : {
+          hasControlFeatures: !!cf.hasControlFeatures,
+          hasGoldenShare: cf.hasGoldenShare,
+          hasShareholderAgreements: cf.hasShareholderAgreements,
+          description: cf.description ?? "",
+        };
+
+  return {
+    ultimateParent: {
+      name: src?.ultimateParent?.name ?? "",
+      status: (src?.ultimateParent?.status as "named" | "independent" | undefined) ?? undefined,
+    },
+    topShareholders: Array.isArray(src?.topShareholders)
+      ? src!.topShareholders.map((r) => ({
+          id: r?.id ?? undefined,
+          name: r?.name ?? "",
+          pct:
+            r?.pct == null
+              ? null
+              : Number.isFinite(Number(r.pct))
+              ? Number(r.pct)
+              : null,
+        }))
+      : [],
+    isListedEquity: src?.isListedEquity as boolean | undefined,
+    shareClasses,      // ✅ either undefined or a valid ShareClassesValue
+    controlFeatures,   // ✅ either undefined or a valid ControlFeaturesValue
+  };
+}, [gov?.ownership]);
 
   
-    const bodyValue = useMemo<GovernanceBodyValue>(() => {
+
+  const bodyValue = useMemo<GovernanceBodyValue>(() => {
     const src = gov?.body;
+
+    const toNum = (x: unknown): number | null => {
+      if (x == null) return null;
+      const n = Number(x);
+      return Number.isFinite(n) ? n : null;
+    };
+
     return {
-        highestBodyName: src?.highestBodyName ?? "",
-        chairCeoRoles: (src?.chairCeoRoles as "separate" | "combined") ?? "separate",
-        directors: Array.isArray(src?.directors)
+      highestBodyName: src?.highestBodyName ?? "",
+      // ⬇️ allow empty (undefined) so the select starts unselected
+      chairCeoRoles: (src?.chairCeoRoles as "separate" | "combined" | undefined) ?? undefined,
+
+      directors: Array.isArray(src?.directors)
         ? src!.directors.map((d) => ({
             id: d?.id ?? undefined,
             fullName: d?.fullName ?? "",
-            role: (d?.role as DirectorRow["role"]) ?? "member",
-            independence: (d?.independence as DirectorRow["independence"]) ?? "non-independent",
-            gender: (d?.gender as DirectorRow["gender"]) ?? "undisclosed",
-            ageBand: (d?.ageBand as DirectorRow["ageBand"]) || undefined,
+            // ⬇️ allow all these to be undefined so selects can be empty
+            role: (d?.role as DirectorRow["role"] | undefined) ?? undefined,
+            independence: (d?.independence as DirectorRow["independence"] | undefined) ?? undefined,
+            gender: (d?.gender as DirectorRow["gender"] | undefined) ?? undefined,
+            ageBand: (d?.ageBand as DirectorRow["ageBand"] | undefined) ?? undefined,
+
             nationality: d?.nationality ?? "",
-            tenureYears:
-                d?.tenureYears == null
-                ? null
-                : Number.isFinite(Number(d.tenureYears))
-                ? Number(d.tenureYears)
-                : null,
+            tenureYears: toNum(d?.tenureYears),
             appointedAt: d?.appointedAt ?? "",
-            committees: (d?.committees as DirectorRow["committees"]) ?? [],
-            meetingsHeld:
-                d?.meetingsHeld == null
-                ? null
-                : Number.isFinite(Number(d.meetingsHeld))
-                ? Number(d.meetingsHeld)
-                : null,
-            meetingsAttended:
-                d?.meetingsAttended == null
-                ? null
-                : Number.isFinite(Number(d.meetingsAttended))
-                ? Number(d.meetingsAttended)
-                : null,
-            }))
+            committees: Array.isArray(d?.committees) ? (d!.committees as DirectorRow["committees"]) : undefined,
+
+            meetingsHeld: toNum(d?.meetingsHeld),
+            meetingsAttended: toNum(d?.meetingsAttended),
+          }))
         : [],
-        meetingsHeldTotal:
-        src?.meetingsHeldTotal == null
-            ? null
-            : Number.isFinite(Number(src.meetingsHeldTotal))
-            ? Number(src.meetingsHeldTotal)
-            : null,
-        boardEvaluation: src?.boardEvaluation
+
+      meetingsHeldTotal: toNum(src?.meetingsHeldTotal),
+
+      boardEvaluation: src?.boardEvaluation
         ? {
-            conducted: (src.boardEvaluation.conducted as "yes" | "no") ?? "no",
-            type: (src.boardEvaluation.type as "internal" | "external") || undefined,
+            // ⬇️ allow empty (undefined) so the select starts unselected
+            conducted: (src.boardEvaluation.conducted as "yes" | "no" | undefined) ?? undefined,
+            type: (src.boardEvaluation.type as "internal" | "external" | undefined) ?? undefined,
             date: src.boardEvaluation.date ?? "",
-            }
-        : { conducted: "no" },
+          }
+        : undefined,
     };
     }, [gov?.body]);
 
-  const oversightValue = useMemo<OversightValue>(() => {
+
+    const oversightValue = useMemo<OversightValue>(() => {
     const src = gov?.oversight;
+
+    // leave selects undefined so UI can start unselected
+    const oversightBody = src?.oversightBody as OversightBody | undefined;
+    const briefingFrequency = src?.briefingFrequency as BriefingFrequency | undefined;
+
+    const namesRoles = Array.isArray(src?.namesRoles)
+      ? src!.namesRoles.map((r) => ({ name: r?.name ?? "", role: r?.role ?? "" }))
+      : [];
+
+    const reportApproval = src?.reportApproval
+      ? {
+          approver: src.reportApproval.approver as Approver | undefined,
+          approved: src.reportApproval.approved as YesNo | undefined,
+        }
+      : undefined;
+
+    const assurance = src?.assurance
+      ? {
+          level: src.assurance.level as AssuranceLevel | undefined,
+          // keep inputs controlled; default to empty string
+          providerName: typeof src.assurance.providerName === "string" ? src.assurance.providerName : "",
+        }
+      : undefined;
+
     return {
-      oversightBody: (src?.oversightBody as OversightBody) ?? "board",
-      namesRoles: Array.isArray(src?.namesRoles)
-        ? src!.namesRoles.map((r) => ({ name: r?.name ?? "", role: r?.role ?? "" }))
-        : [],
-      briefingFrequency: (src?.briefingFrequency as BriefingFrequency) ?? "quarterly",
-      reportApproval: {
-        approver: (src?.reportApproval?.approver as Approver) ?? "board",
-        approved: (src?.reportApproval?.approved as YesNo) ?? "no",
-      },
-      assurance: {
-        level: (src?.assurance?.level as AssuranceLevel) ?? "none",
-        providerName: src?.assurance?.providerName ?? "",
-      },
-    };
+      oversightBody,
+      namesRoles,
+      briefingFrequency,
+      reportApproval,
+      assurance,
+    } satisfies OversightValue;
   }, [gov?.oversight]);
+
 
   const directorsMini: DirectorMini[] = useMemo(() => {
     const src = (gov?.body?.directors ?? []) as any[];
@@ -215,9 +242,9 @@ export function GovernanceStep() {
   const committeesValue = useMemo<CommitteesValue>(() => {
     const src = (gov?.committees as CommitteesValue) ?? ({} as CommitteesValue);
     const defOne = (): OneCommitteeValue => ({
-      exists: false,
+      exists: undefined,
       chairId: undefined,
-      memberIds: [],
+      memberIds: undefined,
       independenceMajority: null,
       meetingsHeld: null,
       responsibilities: "",
@@ -231,117 +258,123 @@ export function GovernanceStep() {
     };
   }, [gov?.committees]);
 
+
   const remunerationValue = useMemo<ExecutiveRemunerationValue>(() => {
     const src = (gov?.remuneration as any) ?? {};
+
+    const toNum = (x: unknown): number | null => {
+      if (x == null) return null;
+      const n = Number(x);
+      return Number.isFinite(n) ? n : null;
+    };
+
     return {
       policy: {
-        url: src?.policy?.url ?? "",
-        uploadId: src?.policy?.uploadId ?? "",
+        url: typeof src?.policy?.url === "string" ? src.policy.url : "",
+        uploadId: typeof src?.policy?.uploadId === "string" ? src.policy.uploadId : "",
       },
       payElements: {
         fixed: !!src?.payElements?.fixed,
         annualBonus: !!src?.payElements?.annualBonus,
         lti: !!src?.payElements?.lti,
       },
-      esgLinked: (src?.esgLinked as "yes" | "no") ?? "no",
+      esgLinked: (src?.esgLinked as "yes" | "no" | undefined) ?? undefined,
       esgMetrics: Array.isArray(src?.esgMetrics)
         ? src.esgMetrics.map((r: any) => ({
-            name: r?.name ?? "",
-            weightPct:
-              r?.weightPct == null
-                ? null
-                : Number.isFinite(Number(r.weightPct))
-                ? Number(r.weightPct)
-                : null,
+            name: typeof r?.name === "string" ? r.name : "",
+            weightPct: toNum(r?.weightPct),
           }))
         : [],
       ceoPay: {
-        amount:
-          src?.ceoPay?.amount == null
-            ? null
-            : Number.isFinite(Number(src.ceoPay.amount))
-            ? Number(src.ceoPay.amount)
-            : null,
-        currency: src?.ceoPay?.currency ?? "",
+        amount: toNum(src?.ceoPay?.amount),
+        currency:
+          typeof src?.ceoPay?.currency === "string" && src.ceoPay.currency.trim()
+            ? src.ceoPay.currency
+            : undefined,
       },
       medianEmployeePay: {
-        amount:
-          src?.medianEmployeePay?.amount == null
-            ? null
-            : Number.isFinite(Number(src.medianEmployeePay.amount))
-            ? Number(src.medianEmployeePay.amount)
-            : null,
-        currency: src?.medianEmployeePay?.currency ?? "",
+        amount: toNum(src?.medianEmployeePay?.amount),
+        currency:
+          typeof src?.medianEmployeePay?.currency === "string" && src.medianEmployeePay.currency.trim()
+            ? src.medianEmployeePay.currency
+            : undefined,
       },
     };
   }, [gov?.remuneration]);
 
+
   const ethics: EthicsComplianceValue = useMemo(() => {
-      const src = (gov as any)?.ethics ?? {};
+    const src = (gov as any)?.ethics ?? {};
 
-      // Policies: ensure every key exists with a default structure
-      const policies = {
-        codeOfConduct:     src.policies?.codeOfConduct     ?? { exists: false, date: "", url: "" },
-        antiCorruption:    src.policies?.antiCorruption    ?? { exists: false, date: "", url: "" },
-        conflictOfInterest:src.policies?.conflictOfInterest?? { exists: false, date: "", url: "" },
-        whistleblowing:    src.policies?.whistleblowing    ?? { exists: false, date: "", url: "" },
-        relatedParty:      src.policies?.relatedParty      ?? { exists: false, date: "", url: "" },
-        giftsHospitality:  src.policies?.giftsHospitality  ?? { exists: false, date: "", url: "" },
-        dataPrivacy:       src.policies?.dataPrivacy       ?? { exists: false, date: "", url: "" },
-      };
+    const policies = {
+      codeOfConduct:     src.policies?.codeOfConduct     ?? { exists: false, date: "", url: "" },
+      antiCorruption:    src.policies?.antiCorruption    ?? { exists: false, date: "", url: "" },
+      conflictOfInterest:src.policies?.conflictOfInterest?? { exists: false, date: "", url: "" },
+      whistleblowing:    src.policies?.whistleblowing    ?? { exists: false, date: "", url: "" },
+      relatedParty:      src.policies?.relatedParty      ?? { exists: false, date: "", url: "" },
+      giftsHospitality:  src.policies?.giftsHospitality  ?? { exists: false, date: "", url: "" },
+      dataPrivacy:       src.policies?.dataPrivacy       ?? { exists: false, date: "", url: "" },
+    };
 
-      const trainingCoverage = {
-        codeOfConductPct:  src.trainingCoverage?.codeOfConductPct  ?? null,
-        antiCorruptionPct: src.trainingCoverage?.antiCorruptionPct ?? null,
-      };
+    const trainingCoverage = {
+      codeOfConductPct:  src.trainingCoverage?.codeOfConductPct  ?? null,
+      antiCorruptionPct: src.trainingCoverage?.antiCorruptionPct ?? null,
+    };
 
-      const incidents = {
-        corruption:  src.incidents?.corruption  ?? null,
-        fraud:       src.incidents?.fraud       ?? null,
-        dataPrivacy: src.incidents?.dataPrivacy ?? null,
-        other:       src.incidents?.other       ?? null,
-        otherText:   src.incidents?.otherText   ?? "",
-      };
+    const incidents = {
+      corruption:  src.incidents?.corruption  ?? null,
+      fraud:       src.incidents?.fraud       ?? null,
+      dataPrivacy: src.incidents?.dataPrivacy ?? null,
+      other:       src.incidents?.other       ?? null,
+      otherText:   src.incidents?.otherText   ?? "",
+    };
 
-      const penalties = {
-        finesAmount:       src.penalties?.finesAmount       ?? null,
-        finesCurrency:     src.penalties?.finesCurrency     ?? "",
-        nonMonetaryCount:  src.penalties?.nonMonetaryCount  ?? null,
-      };
+    const penalties = {
+      finesAmount:       src.penalties?.finesAmount       ?? null,
+      finesCurrency:     src.penalties?.finesCurrency     ?? "",
+      nonMonetaryCount:  src.penalties?.nonMonetaryCount  ?? null,
+    };
 
-      const politicalContributions = {
-        none:     !!src.politicalContributions?.none,
-        amount:   src.politicalContributions?.none ? null : (src.politicalContributions?.amount ?? null),
-        currency: src.politicalContributions?.currency ?? "",
-      };
+    const politicalContributions = {
+      none:     !!src.politicalContributions?.none,
+      amount:   src.politicalContributions?.none ? null : (src.politicalContributions?.amount ?? null),
+      currency: src.politicalContributions?.currency ?? "",
+    };
 
-      return {
-        policies,
-        trainingCoverage,
-        whistleblowingChannel: (src.whistleblowingChannel as "yes" | "no") ?? "no",
-        incidents,
-        penalties,
-        politicalContributions,
-      } satisfies EthicsComplianceValue;
-    }, [gov?.ethics]);
+    return {
+      policies,
+      trainingCoverage,
+      whistleblowingChannel: (src.whistleblowingChannel as "yes" | "no" | undefined) ?? undefined,
+      incidents,
+      penalties,
+      politicalContributions,
+    } satisfies EthicsComplianceValue;
+  }, [gov?.ethics]);
+
 
 
   const rpt: RptValue = useMemo(() => {
     const src = (gov as any)?.rpt ?? {};
     const rows = Array.isArray(src.rows) ? src.rows : [];
+
+    const toNum = (x: unknown): number | null => {
+      if (x == null) return null;
+      const n = Number(x);
+      return Number.isFinite(n) ? n : null;
+    };
+
     return {
       rows: rows.map((r: any) => ({
         id: r?.id || crypto.randomUUID(),
         counterparty: r?.counterparty ?? "",
-        relationship:
-          r?.relationship ?? ("shareholder" as RptRow["relationship"]),
+        relationship: (r?.relationship as RptRow["relationship"] | undefined) ?? undefined,
         amount: {
-          value: r?.amount?.value ?? null,
-          currency: r?.amount?.currency ?? "",
+          value: toNum(r?.amount?.value),
+          currency: typeof r?.amount?.currency === "string" ? r.amount.currency : "",
         },
-        nature: r?.nature ?? ("goods" as RptRow["nature"]),
-        armsLength: (r?.armsLength as YesNo) ?? "yes",
-        independentApproval: (r?.independentApproval as YesNo) ?? "yes",
+        nature: (r?.nature as RptRow["nature"] | undefined) ?? undefined,
+        armsLength: (r?.armsLength as YesNo | undefined) ?? undefined,
+        independentApproval: (r?.independentApproval as YesNo | undefined) ?? undefined,
         notes: r?.notes ?? "",
       })),
     };
@@ -351,7 +384,7 @@ export function GovernanceStep() {
       const src = (gov as any)?.audit ?? {};
       const ext = src.externalAuditor ?? {};
       const concerns =
-        src?.criticalConcerns ?? ({ mechanism: "no", raised: null, resolved: null } as const);
+        src?.criticalConcerns ?? ({ mechanism: undefined, raised: null, resolved: null } as const);
       const fees = src.fees ?? {};
 
       const toNum = (n: unknown): number | null => {
@@ -366,9 +399,9 @@ export function GovernanceStep() {
           initialYear: toNum(ext.initialYear),
           latestRotationYear: toNum(ext.latestRotationYear),
         },
-        internalAuditFunction: (src.internalAuditFunction ?? "no") as AuditorValue["internalAuditFunction"],
+        internalAuditFunction: (src.internalAuditFunction as YesNo | undefined) ?? undefined,
         criticalConcerns: {
-          mechanism: concerns.mechanism,
+          mechanism: (concerns.mechanism as YesNo | undefined) ?? undefined,
           raised: toNum(concerns.raised),
           resolved: toNum(concerns.resolved),
         },
@@ -383,10 +416,16 @@ export function GovernanceStep() {
   const materiality: MaterialityValue = useMemo(() => {
     const src = (gov as any)?.materiality ?? {};
 
-    const assessment = {
-      done: (src.assessment?.done as YesNoPlanned) ?? "no",
-      method: (src.assessment?.method ?? "") as string,
-      date: (src.assessment?.date ?? "") as string,
+    const rawDone = src.assessment?.done as unknown;
+    const done: YesNoPlanned | undefined =
+      rawDone === "yes" || rawDone === "no" || rawDone === "planned"
+        ? (rawDone as YesNoPlanned)
+        : undefined;
+
+    const assessment: Assessment = {
+      done,
+      method: typeof src.assessment?.method === "string" ? src.assessment.method : "",
+      date: typeof src.assessment?.date === "string" ? src.assessment.date : "",
     };
 
     const stakeholderGroups: StakeholderKey[] = Array.isArray(src.stakeholderGroups)
@@ -397,7 +436,9 @@ export function GovernanceStep() {
       typeof src.otherStakeholderText === "string" ? src.otherStakeholderText : "";
 
     const topMaterialTopics: string[] = Array.isArray(src.topMaterialTopics)
-      ? (src.topMaterialTopics as string[]).map((t) => (typeof t === "string" ? t : "")).filter(Boolean)
+      ? (src.topMaterialTopics as string[])
+          .map((t) => (typeof t === "string" ? t : ""))
+          .filter(Boolean)
       : [];
 
     const criticalConcernsComms = {

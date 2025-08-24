@@ -9,7 +9,7 @@ import {
   TARGET_CATEGORIES,
   GOV_POLICY_CATEGORIES,
   BOARD_ROLES,
-  ENERGY_CATEGORY, // ← use the shared constant to avoid drift
+  ENERGY_CATEGORY,
 } from "@/constants/esg.constants";
 
 import {
@@ -23,6 +23,8 @@ import {
   WASTE_UNITS,
   WASTE_MEASUREMENT_METHODS,
 } from "@/constants/esg.waste.constants";
+
+import { GHG_BoundaryEnum } from "@/constants/esg.ghg.constants";
 
 /** ----------------------- Helpers ----------------------- */
 export const coerceDecimal = (msg = "Invalid number") =>
@@ -52,19 +54,53 @@ export function parseEmployeeRange(value?: string) {
 }
 
 /** -------------------- Environment ---------------------- */
-export const EnvironmentGHGSchema = z.object({
-  year: z.number().int().min(1900).max(3000),
-  scope1_tCO2e: nonNegDecimal().nullable().optional(),
-  scope2_tCO2e: nonNegDecimal().nullable().optional(),
-  scope3_tCO2e: nonNegDecimal().nullable().optional(),
-  methodology: z
-    .string()
-    .optional()
-    .refine((v) => !v || GHG_METHODOLOGIES.includes(v as any), {
-      message: "Unknown methodology",
-    }),
-  notes: z.string().max(2000).optional(),
-});
+export const EnvironmentGHGSchema = z
+  .object({
+    year: z.number().int().min(1900).max(3000),
+
+    scope1_tCO2e: nonNegDecimal().nullable().optional(),
+    scope2_tCO2e: nonNegDecimal().nullable().optional(),
+    scope3_tCO2e: nonNegDecimal().nullable().optional(),
+
+    // NEW — boundary selection
+    boundary: GHG_BoundaryEnum.optional(),
+
+    // NEW — equity share percentage (0–100); only required when boundary === "Equity share"
+    equitySharePct: z
+      .number()
+      .min(0, "Must be ≥ 0%")
+      .max(100, "Must be ≤ 100%")
+      .nullable()
+      .optional(),
+
+    methodology: z
+      .string()
+      .optional()
+      .refine((v) => !v || GHG_METHODOLOGIES.includes(v as any), {
+        message: "Unknown methodology",
+      }),
+
+    notes: z.string().max(2000).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.boundary === "Equity share") {
+      // require a strictly positive percentage when equity share is chosen
+      if (val.equitySharePct == null || Number.isNaN(val.equitySharePct)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["equitySharePct"],
+          message: "Enter your equity share percentage.",
+        });
+      } else if (val.equitySharePct <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["equitySharePct"],
+          message: "Equity share must be > 0%.",
+        });
+      }
+    }
+  });
+
 
 /** Aggregate rows the UI writes after computing MWh */
 const EnergyRowSchema = z
@@ -544,12 +580,27 @@ export const SocialSchema = z.object({
 
   community: z.object({
     volunteerHours: nonNegDecimal().optional(),
-    cashDonations: z.object({ amount: nonNegDecimal(), currency: z.string().max(8) }).optional(),
-    inKindDonations: z.object({ amount: nonNegDecimal(), currency: z.string().max(8) }).optional(),
+
+    cashDonations: z
+      .object({
+        amount: nonNegDecimal(),
+        currency: z.string().max(8), // ISO code / symbol
+      })
+      .optional(),
+
+    inKindDonations: z
+      .object({
+        amount: nonNegDecimal(),
+        currency: z.string().max(8), 
+        description: z.string().max(255).nullable().optional(), // NEW field
+      })
+      .optional(),
+
     estimatedBeneficiaries: nonNegDecimal().optional(),
     sitesWithAssessment: nonNegDecimal().optional(),
     totalSites: nonNegDecimal().optional(),
   }).optional(),
+
 });
 
 
@@ -625,19 +676,32 @@ const GovernanceOwnershipSchema = z
   .object({
     ultimateParent: z.object({
       name: z.string().min(1, "Required"),
-      status: z.enum(["named", "independent"]).default("named"),
+      // was: z.enum(["named", "independent"]).default("named")
+      status: z
+        .enum(["named", "independent"])
+        .optional() // <- allow undefined so the select can be empty
     }),
     topShareholders: z.array(ShareholderRowSchema).default([]),
-    isListedEquity: z.boolean().default(false),
+    isListedEquity: z.boolean().optional(),
     shareClasses: ShareClassesSchema.optional(),
-    controlFeatures: z
-      .object({
-        hasControlFeatures: z.boolean(),
-        description: z.string().max(1000).optional(),
-      })
-      .optional(),
+    controlFeatures: z.object({
+      hasControlFeatures: z.boolean(),
+      hasGoldenShare: z.boolean().optional(),
+      hasShareholderAgreements: z.boolean().optional(),
+      description: z.string().max(1000).optional(),
+    }).optional()
   })
   .superRefine((v, ctx) => {
+    // (a) Require status on submit (keeps UX: empty initially, validated on save)
+    if (!v.ultimateParent.status) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Required",
+        path: ["ultimateParent", "status"],
+      });
+    }
+
+    // (b) Listed-equity sum rule
     if (v.isListedEquity) {
       const sum =
         (v.topShareholders ?? []).reduce(
@@ -653,6 +717,7 @@ const GovernanceOwnershipSchema = z
       }
     }
   });
+
 
 /* ========== (2) Governance Body & Composition ========== */
 

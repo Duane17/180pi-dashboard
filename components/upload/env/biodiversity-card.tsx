@@ -96,7 +96,7 @@ export function BiodiversityCard({ value, onChange, readOnly }: Props) {
       latitude: null,
       longitude: null,
       areaHectares: null,
-      habitat: "Forest",
+      habitat: undefined,
       designation: {},
     };
     onChange({ sites: [...sites, next] });
@@ -118,9 +118,9 @@ export function BiodiversityCard({ value, onChange, readOnly }: Props) {
   const addImpact = () => {
     if (readOnly) return;
     const next: BiodiversityImpact = {
-      activity: "New construction",
-      receptor: "Habitat",
-      proximity: "Inside",
+      activity: undefined as any,
+      receptor: undefined as any,
+      proximity: undefined as any,
       severity: null,
       extent: null,
       irreversibility: null,
@@ -186,11 +186,9 @@ export function BiodiversityCard({ value, onChange, readOnly }: Props) {
                 />
                 <SelectField
                   label="Primary habitat / land cover"
-                  value={row.habitat ?? "Forest"}
+                  value={row.habitat}
                   options={HABITATS}
-                  onChange={(v) =>
-                    update({ habitat: (v as BiodiversitySite["habitat"]) || "Forest" })
-                  }
+                  onChange={(v) => update({ habitat: v as BiodiversitySite["habitat"] | undefined })}
                 />
               </div>
 
@@ -270,75 +268,74 @@ export function BiodiversityCard({ value, onChange, readOnly }: Props) {
         const mit = row.mitigation ?? {};
         return (
         <>
-            {/* Inputs grid: 2-up on small, 6-up on large, with comfortable gaps */}
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-6">
-            <div className="min-w-0">
+            {/* Inputs grid: 2 rows × 3 cols */}
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="min-w-0">
                 <SelectField
-                label="Activity"
-                value={row.activity}
-                options={ACTIVITIES}
-                onChange={(v) =>
-                    update({
-                    activity: (v as BiodiversityImpact["activity"]) || "New construction",
-                    })
-                }
+                  label="Activity"
+                  value={row.activity}
+                  options={ACTIVITIES}
+                  onChange={(v) =>
+                    update({ activity: v as BiodiversityImpact["activity"] | undefined })
+                  }
                 />
+              </div>
+
+              <div className="min-w-0">
+                <SelectField
+                  label="Receptor"
+                  value={row.receptor}
+                  options={RECEPTORS}
+                  onChange={(v) =>
+                    update({ receptor: v as BiodiversityImpact["receptor"] | undefined })
+                  }
+                />
+              </div>
+
+              <div className="min-w-0">
+                <SelectField
+                  label="Proximity to sensitive area"
+                  value={row.proximity}
+                  options={PROXIMITIES}
+                  onChange={(v) =>
+                    update({ proximity: v as BiodiversityImpact["proximity"] | undefined })
+                  }
+                />
+              </div>
+
+              <div className="min-w-0">
+                <SelectField
+                  label="Severity (1–5)"
+                  value={(row.severity ?? "") as any}
+                  options={ONE_TO_FIVE.map(String) as unknown as readonly string[]}
+                  onChange={(v) => update({ severity: v ? Number(v) : null })}
+                  allowEmpty
+                />
+              </div>
+
+              <div className="min-w-0">
+                <SelectField
+                  label="Extent (1–5)"
+                  value={(row.extent ?? "") as any}
+                  options={ONE_TO_FIVE.map(String) as unknown as readonly string[]}
+                  onChange={(v) => update({ extent: v ? Number(v) : null })}
+                  allowEmpty
+                />
+              </div>
+
+              <div className="min-w-0">
+                <SelectField
+                  label="Irreversibility (1–5)"
+                  value={(row.irreversibility ?? "") as any}
+                  options={ONE_TO_FIVE.map(String) as unknown as readonly string[]}
+                  onChange={(v) =>
+                    update({ irreversibility: v ? Number(v) : null })
+                  }
+                  allowEmpty
+                />
+              </div>
             </div>
 
-            <div className="min-w-0">
-                <SelectField
-                label="Receptor"
-                value={row.receptor}
-                options={RECEPTORS}
-                onChange={(v) =>
-                    update({ receptor: (v as BiodiversityImpact["receptor"]) || "Habitat" })
-                }
-                />
-            </div>
-
-            <div className="min-w-0 lg:col-span-2">
-                <SelectField
-                label="Proximity to sensitive area"
-                value={row.proximity}
-                options={PROXIMITIES}
-                onChange={(v) =>
-                    update({
-                    proximity: (v as BiodiversityImpact["proximity"]) || "Inside",
-                    })
-                }
-                />
-            </div>
-
-            <div className="min-w-0">
-                <SelectField
-                label="Severity (1–5)"
-                value={(row.severity ?? "") as any}
-                options={ONE_TO_FIVE.map(String) as unknown as readonly string[]}
-                onChange={(v) => update({ severity: v ? Number(v) : null })}
-                allowEmpty
-                />
-            </div>
-
-            <div className="min-w-0">
-                <SelectField
-                label="Extent (1–5)"
-                value={(row.extent ?? "") as any}
-                options={ONE_TO_FIVE.map(String) as unknown as readonly string[]}
-                onChange={(v) => update({ extent: v ? Number(v) : null })}
-                allowEmpty
-                />
-            </div>
-
-            <div className="min-w-0">
-                <SelectField
-                label="Irreversibility (1–5)"
-                value={(row.irreversibility ?? "") as any}
-                options={ONE_TO_FIVE.map(String) as unknown as readonly string[]}
-                onChange={(v) => update({ irreversibility: v ? Number(v) : null })}
-                allowEmpty
-                />
-            </div>
-            </div>
 
             <p className="mt-2 text-xs text-gray-600">{significanceHelp}</p>
 
