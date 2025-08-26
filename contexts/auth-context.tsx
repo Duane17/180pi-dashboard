@@ -1,6 +1,14 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import axios from "axios";
 import { api, setAuthFailureHandler } from "@/lib/api";
 import {
@@ -19,7 +27,7 @@ import type {
 } from "@/types/auth";
 import { isApiErrorResponse } from "@/types/api";
 import { subscribe as subscribeTokens } from "@/lib/auth-tokens";
-
+import { usePathname } from "next/navigation";
 
 /* ---------------------------------------------
    LocalStorage keys (persist user/company/role)
@@ -39,16 +47,13 @@ type AuthState = {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isReady: boolean;
 };
 
 type AuthContextValue = AuthState & {
-  /** Load state from localStorage (tokens + user/company/role). Called automatically on mount. */
   loadFromStorage: () => void;
-  /** Sign in with email/password. Returns the LoginResponse on success. Throws normalized ApiErrorResponse on error. */
   signIn: (payload: LoginRequest) => Promise<LoginResponse>;
-  /** Sign up (register + bootstrap company). Returns the RegisterResponse on success. Throws normalized ApiErrorResponse on error. */
   signUp: (payload: RegisterRequest) => Promise<RegisterResponse>;
-  /** Clear tokens + local storage + in-memory state. */
   signOut: () => void;
 };
 
@@ -58,42 +63,46 @@ const AuthContext = createContext<AuthContextValue | null>(null);
    Provider
 ---------------------------------------------- */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [user, setUser] = useState<UserSummary | null>(null);
   const [company, setCompany] = useState<CompanySummary | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
 
-  const isAuthenticated = Boolean(accessToken && user);
+  const isAuthenticated = Boolean(user);   
+
   const tokensLookSane = useCallback((at: string | null, rt: string | null) => {
     const ok = (s: string | null) => !!s && typeof s === "string" && s.length >= 16;
     return ok(at) && ok(rt);
   }, []);
-  
-  const persistIdentity = useCallback((u: UserSummary | null, c: CompanySummary | null, r: string | null) => {
-    if (typeof window === "undefined") return;
-    if (u) localStorage.setItem(LS_USER, JSON.stringify(u));
-    else localStorage.removeItem(LS_USER);
 
-    if (c) localStorage.setItem(LS_COMPANY, JSON.stringify(c));
-    else localStorage.removeItem(LS_COMPANY);
+  const persistIdentity = useCallback(
+    (u: UserSummary | null, c: CompanySummary | null, r: string | null) => {
+      if (typeof window === "undefined") return;
+      if (u) localStorage.setItem(LS_USER, JSON.stringify(u));
+      else localStorage.removeItem(LS_USER);
 
-    if (r) localStorage.setItem(LS_ROLE, r);
-    else localStorage.removeItem(LS_ROLE);
-  }, []);
+      if (c) localStorage.setItem(LS_COMPANY, JSON.stringify(c));
+      else localStorage.removeItem(LS_COMPANY);
+
+      if (r) localStorage.setItem(LS_ROLE, r);
+      else localStorage.removeItem(LS_ROLE);
+    },
+    []
+  );
 
   const loadFromStorage = useCallback(() => {
     if (typeof window === "undefined") return;
 
-    // Tokens come from auth-tokens (already hydrated in Providers via initAuthTokens)
     const at = getAccessToken();
     const rt = getRefreshToken();
 
     setAccessTokenState(at);
     setRefreshTokenState(rt);
 
-    // Identity details (best-effort) come from localStorage
     const uRaw = localStorage.getItem(LS_USER);
     const cRaw = localStorage.getItem(LS_COMPANY);
     const rRaw = localStorage.getItem(LS_ROLE);
@@ -111,8 +120,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(LS_COMPANY);
     }
     setRole(rRaw || null);
-
-    setIsLoading(false);
+    
+    setIsLoading(true);
+    setIsReady(false)
   }, []);
 
   const signOut = useCallback(() => {
@@ -130,12 +140,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data } = await api.post<LoginResponse>("/auth/login", payload);
 
-        // Persist tokens
         setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
         setAccessTokenState(data.accessToken);
         setRefreshTokenState(data.refreshToken);
 
-        // Persist identity
         setUser(data.user);
         setCompany(data.company);
         setRole(data.role ?? null);
@@ -143,9 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return data;
       } catch (err: any) {
-        // Normalize and rethrow so the caller (mutation) can map to field errors / summary
         if (axios.isAxiosError(err) && isApiErrorResponse(err.response?.data)) {
-          throw err.response!.data; // ApiErrorResponse
+          throw err.response!.data;
         }
         throw { message: "Unable to sign in. Please try again." };
       }
@@ -153,56 +160,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persistIdentity]
   );
 
-  const validateSession = useCallback(async () => {
-    const at = getAccessToken();
-    const rt = getRefreshToken();
-
-    // If tokens are obviously missing/invalid, clear and bail early.
-    if (!tokensLookSane(at, rt)) {
-      signOut();
-      return;
-    }
-
-    try {
-      // Any route behind requireAuth is fine; use /users with a small query.
-      // This will attach Authorization via the request interceptor.
-      await api.get("/users", { params: { limit: 1 } });
-      // If this succeeds, we consider the session valid.
-    } catch (err: any) {
-      // If the server responded, normalize the error; otherwise it may be a network issue.
-      if (axios.isAxiosError(err) && err.response) {
-        if (isApiErrorResponse(err.response.data)) {
-          // Optionally: console.warn("Auth validation failed:", err.response.data.message);
-        }
-        // Clear tokens + identity if the validation call fails.
-        signOut();
-      } else {
-        // Network error with no response: keep current state (developer may be booting backend).
-        // Optionally show a non-blocking toast/log here if you prefer.
-      }
-    }
-  }, [signOut, tokensLookSane]);
-
   const signUp = useCallback(
     async (payload: RegisterRequest): Promise<RegisterResponse> => {
       try {
         const { data } = await api.post<RegisterResponse>("/auth/register", payload);
 
-        // Persist tokens
         setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
         setAccessTokenState(data.accessToken);
         setRefreshTokenState(data.refreshToken);
 
-        // Persist identity
         setUser(data.user);
         setCompany(data.company);
-        setRole("Owner"); // Controller ensures Owner role on bootstrap
-        persistIdentity(data.user, data.company, "Owner");
+
+        // IMPORTANT HARDENING:
+        // Use the server-provided role if present; don't hardcode "Owner".
+        setRole((data as any).role ?? null);
+        persistIdentity(data.user, data.company, (data as any).role ?? null);
 
         return data;
       } catch (err: any) {
         if (axios.isAxiosError(err) && isApiErrorResponse(err.response?.data)) {
-          throw err.response!.data; // ApiErrorResponse
+          throw err.response!.data;
         }
         throw { message: "Unable to create your account. Please try again." };
       }
@@ -210,10 +188,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persistIdentity]
   );
 
-  // Register a global auth-failure handler so interceptor-triggered 401/refresh failures log the user out.
+  // Ensure interceptor-triggered auth failures log the user out.
   useEffect(() => {
     setAuthFailureHandler(({ message } = {}) => {
-      // Optionally: toast(message ?? "Your session has expired.");
+      // Optional toast(message ?? "Your session has expired.")
       signOut();
     });
   }, [signOut]);
@@ -223,31 +201,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadFromStorage();
   }, [loadFromStorage]);
 
-  // After hydration, if tokens exist, validate them once.
+  // Validate session once after hydration (if tokens exist).
+  // IMPORTANT CHANGES: do not gate this on isLoading; run once when tokens are present.
+  const validatedOnceRef = useRef(false);
+
+  const validateSession = useCallback(async () => {
+    const at = getAccessToken();
+    const rt = getRefreshToken();
+    if (!tokensLookSane(at, rt)) {
+      // Clearly unauthenticated
+      setIsReady(true); 
+      return;
+    }
+    try {
+      const res = await api.get("/auth/me");
+      const { user: srvUser, company: srvCompany, role: srvRole } = res.data as {
+        user: UserSummary;
+        company: CompanySummary | null;
+        role: string | null;
+      };
+
+      setUser(srvUser ?? null);
+      setCompany(srvCompany ?? null);
+      setRole(srvRole ?? null);
+      persistIdentity(srvUser ?? null, srvCompany ?? null, srvRole ?? null);
+    } catch (err: any) {
+      // Only sign out on 401; don’t nuke session on network hiccups
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        signOut();
+      }
+      // else ignore (keep hydrated LS state)
+    } finally {
+      setIsReady(true);                                     // <-- NEW
+    }
+  }, [persistIdentity, signOut, tokensLookSane]);
+
   useEffect(() => {
-    // Only run after loadFromStorage set isLoading=false
-    if (isLoading) return;
+    if (validatedOnceRef.current) return;
+
+    
+    if (pathname?.startsWith("/auth")) {
+      setIsLoading(false);
+      setIsReady(true);
+      return;
+    }
 
     const at = getAccessToken();
     const rt = getRefreshToken();
-    if (at && rt) {
-      // Flip a short-lived loading state while validating (optional)
-      setIsLoading(true);
+
+    if (tokensLookSane(at, rt)) {
+      validatedOnceRef.current = true;
+      setIsLoading(true); // show loading during validation
       validateSession().finally(() => setIsLoading(false));
+    } else {
+      // No tokens → definitely unauthenticated
+      setIsLoading(false);
+      setIsReady(true); 
     }
-  }, [isLoading, validateSession]);
+  }, [pathname, validateSession, tokensLookSane]);
 
-    // Subscribe to token changes so accessToken/refreshToken state stays in sync
-    useEffect(() => {
-        // Subscribe returns an unsubscribe fn
-        const unsubscribe = subscribeTokens((at, rt) => {
-            setAccessTokenState(at);
-            setRefreshTokenState(rt);
-        });
-        return unsubscribe;
-    }, []);
-
-
+  // Keep in-memory tokens synced with storage via subscription
+  useEffect(() => {
+    const unsubscribe = subscribeTokens((at, rt) => {
+      setAccessTokenState(at);
+      setRefreshTokenState(rt);
+    });
+    return unsubscribe;
+  }, []);
 
   const value: AuthContextValue = useMemo(
     () => ({
@@ -258,6 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshToken,
       isAuthenticated,
       isLoading,
+      isReady,
       loadFromStorage,
       signIn,
       signUp,
@@ -271,6 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshToken,
       isAuthenticated,
       isLoading,
+      isReady,
       loadFromStorage,
       signIn,
       signUp,
