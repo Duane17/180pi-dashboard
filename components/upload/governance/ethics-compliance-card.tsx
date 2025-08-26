@@ -191,12 +191,17 @@ export function EthicsComplianceCard({ value, onChange, readOnly }: Props) {
           />
           {label}
         </label>
-        <TextField
-          label="Date (ISO)"
-          value={row.date ?? ""}
-          onChange={(v) => patchPolicies(k, { date: v ?? "" })}
-          placeholder="YYYY-MM-DD"
-        />
+        <div>
+          <label className="block text-sm text-gray-800 mb-1">Date</label>
+          <input
+            type="date"
+            className="block w-full rounded-lg border border-gray-300/70 bg-white/70 px-3 py-2 text-sm text-gray-800 shadow-sm backdrop-blur focus:outline-none disabled:opacity-60"
+            value={row.date ?? ""}
+            onChange={(e) => patchPolicies(k, { date: e.target.value ?? "" })}
+            disabled={readOnly}
+          />
+        </div>
+
         <div className="sm:col-span-2">
           <TextField
             label="URL (optional)"
