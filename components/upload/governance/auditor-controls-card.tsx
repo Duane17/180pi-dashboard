@@ -58,10 +58,8 @@ function fmtPct(n: number | null | undefined) {
   if (n == null || !Number.isFinite(n)) return "—";
   return `${n.toFixed(1)}%`;
 }
-function fmtYears(n: number | null | undefined) {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `${n} years`;
-}
+const fmtYears = (n: number | null | undefined) =>
+  n == null || !Number.isFinite(n) ? "—" : `${n} yr${n === 1 ? "" : "s"}`;
 
 /* ============================== Component ============================== */
 
@@ -82,11 +80,34 @@ export function AuditorControlsCard({ value, onChange }: Props) {
   const fees = value.fees ?? { total: null, nonAudit: null, currency: "" };
 
   // ---------- Derived ----------
+  const toYear = (v: unknown): number | null => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isInteger(n) ? n : null;
+  };
+
+  // Choose whether tenure counts inclusively (start..end) or elapsed full years
+  const INCLUSIVE_TENURE = false; // set true if you want 2025–2025 => 1 year
+
+  // Inside the component:
   const auditorTenureYears = useMemo(() => {
-    const y = ext.initialYear == null ? null : Number(ext.initialYear);
-    if (y == null || !Number.isFinite(y) || y <= 0) return null;
-    return Math.max(0, currentYear - y);
-  }, [ext.initialYear, currentYear]);
+    const start = toYear(ext.initialYear);
+    const rotation = toYear(ext.latestRotationYear);
+    const CY = currentYear;
+
+    // Validate start
+    if (start == null || start < 1900 || start > CY) return null;
+
+    // Effective end year is either rotation (if present) or current year
+    const end = rotation != null ? Math.min(rotation, CY) : CY;
+
+    // Bad range (rotation before start)
+    if (end < start) return null;
+
+    const yearsElapsed = end - start;              // 2025–2025 => 0
+    const yearsInclusive = yearsElapsed + 1;       // 2025–2025 => 1
+    return INCLUSIVE_TENURE ? yearsInclusive : yearsElapsed;
+  }, [ext.initialYear, ext.latestRotationYear, currentYear]);
+
 
   const nonAuditFeeRatioPct = useMemo(() => {
     const total = toNum(fees.total);

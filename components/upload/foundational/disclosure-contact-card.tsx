@@ -6,7 +6,7 @@ interface DisclosureContactValues {
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
-  contactRole?: string; // NEW: role/job of the contact person
+  contactRole?: string;
 }
 
 type Errors = Partial<Record<keyof DisclosureContactValues, string | undefined>>;

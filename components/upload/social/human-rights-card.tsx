@@ -224,13 +224,15 @@ export function HumanRightsCard({ value, onChange, readOnly }: Props) {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-7">
               <SelectField
                 label="Topic"
-                value={row.topic}
+                value={TOPICS.find((t) => t.value === row.topic)?.label ?? ""}
                 options={TOPICS.map((t) => t.label) as unknown as readonly string[]}
                 onChange={(label) => {
                   const found = TOPICS.find((t) => t.label === label);
                   update({ topic: (found?.value ?? "discrimination") as HumanRightsIncidentTopic });
                 }}
+                allowEmpty
               />
+
               <SelectField
                 label="Confirmed?"
                 value={row.confirmed ?? undefined}

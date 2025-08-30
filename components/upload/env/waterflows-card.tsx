@@ -190,18 +190,20 @@ export function WaterFlowsCard({ value, onChange, readOnly }: WaterFlowsCardProp
                   options={TREATMENT_LEVELS}
                   disabled={readOnly}
                 />
-                <LabeledSelect
+                <LabeledSelect<"Yes" | "No">
                   className="lg:col-span-2"
                   label="Sent for reuse?"
                   value={row.sentToOtherOrgForReuse}
                   onChange={(v) =>
                     updateDischarge(i, {
+                      // keep UI state as "Yes" | "No" | undefined
                       sentToOtherOrgForReuse: v as DischargeRow["sentToOtherOrgForReuse"],
                     })
                   }
                   options={YES_NO}
                   disabled={readOnly}
                 />
+
                 <div className="hidden lg:block lg:col-span-2" />
               </div>
 
@@ -394,7 +396,6 @@ function LabeledNumber({
 }
 
 /* ------------------------------ Period editor ---------------------------- */
-
 function PeriodEditor({
   label,
   period,
@@ -408,7 +409,47 @@ function PeriodEditor({
   disabled?: boolean;
   className?: string;
 }) {
-  const isMonth = period.mode === "month";
+  // helpers
+  const dateStr = (v: any): string => {
+    if (!v) return "";
+    if (typeof v === "string") return v.slice(0, 10);
+    try {
+      return new Date(v).toISOString().slice(0, 10);
+    } catch {
+      return "";
+    }
+  };
+  const monthStr = (v: any): string => {
+    if (!v) return "";
+    if (typeof v === "string") return v.slice(0, 7);
+    try {
+      return new Date(v).toISOString().slice(0, 7);
+    } catch {
+      return "";
+    }
+  };
+
+  // accept both "mode" and "kind"
+  const mode = String((period as any).mode ?? (period as any).kind ?? "month").toLowerCase();
+  const isMonth = mode === "month";
+
+  // accept multiple field names for range; normalize for rendering
+  const startRaw =
+    (period as any).from ??
+    (period as any).startDate ??
+    (period as any).start ??
+    (period as any).dateFrom;
+  const endRaw =
+    (period as any).to ??
+    (period as any).endDate ??
+    (period as any).end ??
+    (period as any).dateTo;
+
+  const startVal = dateStr(startRaw);
+  const endVal = dateStr(endRaw);
+
+  // month value (string "YYYY-MM" or "")
+  const monthVal = monthStr((period as any).month);
 
   return (
     <div className={className}>
@@ -418,7 +459,7 @@ function PeriodEditor({
       <div className="mb-2 inline-flex rounded-lg border border-gray-300/70 bg-white/70 p-0.5 text-xs shadow-sm backdrop-blur">
         <button
           type="button"
-          onClick={() => !disabled && onChange({ mode: "month", month: "" })}
+          onClick={() => !disabled && onChange({ mode: "month", month: "" } as any)}
           className={[
             "px-2 py-1 rounded-md",
             isMonth
@@ -431,7 +472,7 @@ function PeriodEditor({
         </button>
         <button
           type="button"
-          onClick={() => !disabled && onChange({ mode: "range", startDate: "", endDate: "" })}
+          onClick={() => !disabled && onChange({ mode: "range", from: "", to: "" } as any)}
           className={[
             "px-2 py-1 rounded-md",
             !isMonth
@@ -448,8 +489,8 @@ function PeriodEditor({
         <input
           type="month"
           className="h-10 w-full rounded-lg border border-gray-300/70 bg-white/70 px-2 outline-none ring-0 focus:border-gray-400 focus:outline-none disabled:opacity-60"
-          value={period.month ?? ""}
-          onChange={(e) => onChange({ mode: "month", month: e.target.value })}
+          value={monthVal}
+          onChange={(e) => onChange({ mode: "month", month: e.target.value } as any)}
           disabled={disabled}
         />
       ) : (
@@ -459,9 +500,9 @@ function PeriodEditor({
             <input
               type="date"
               className="h-10 w-full rounded-lg border border-gray-300/70 bg-white/70 px-2 outline-none ring-0 focus:border-gray-400 focus:outline-none disabled:opacity-60"
-              value={period.startDate ?? ""}
+              value={startVal}
               onChange={(e) =>
-                onChange({ mode: "range", startDate: e.target.value, endDate: period.endDate })
+                onChange({ mode: "range", from: e.target.value, to: endVal } as any)
               }
               disabled={disabled}
             />
@@ -471,9 +512,9 @@ function PeriodEditor({
             <input
               type="date"
               className="h-10 w-full rounded-lg border border-gray-300/70 bg-white/70 px-2 outline-none ring-0 focus:border-gray-400 focus:outline-none disabled:opacity-60"
-              value={period.endDate ?? ""}
+              value={endVal}
               onChange={(e) =>
-                onChange({ mode: "range", startDate: (period as any).startDate, endDate: e.target.value })
+                onChange({ mode: "range", from: startVal, to: e.target.value } as any)
               }
               disabled={disabled}
             />
@@ -483,3 +524,4 @@ function PeriodEditor({
     </div>
   );
 }
+

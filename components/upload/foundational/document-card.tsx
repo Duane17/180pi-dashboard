@@ -1,7 +1,14 @@
-// components/uploads/document-card.tsx
 "use client";
 
 import * as React from "react";
+
+/**
+ * Why this version is safer:
+ * - All string operations (split / startsWith) guard against undefined.
+ * - We derive MIME and extension via helpers that return "" (never undefined).
+ * - We fall back to extension when MIME is missing (common with synthetic file-like objects).
+ * - matchesAccept() accepts ".pdf" as well as "application/pdf" by default for previous reports.
+ */
 
 export interface DocumentsCardProps {
   /** Single: Registration certificate */
@@ -16,10 +23,10 @@ export interface DocumentsCardProps {
   onPreviousAdd?: (files: File[]) => void;
 
   /** Constraints */
-  acceptRegistration?: string;  // default: "application/pdf,image/*"
-  acceptPrevious?: string;      // default: "application/pdf"
-  maxSizeMBRegistration?: number; // default: 20
-  maxSizeMBPrevious?: number;     // default: 50
+  acceptRegistration?: string;      // default: "application/pdf,image/*,.pdf,.png,.jpg,.jpeg"
+  acceptPrevious?: string;          // default: "application/pdf,.pdf"
+  maxSizeMBRegistration?: number;   // default: 20
+  maxSizeMBPrevious?: number;       // default: 50
 
   /** External error strings */
   registrationError?: string;
@@ -32,14 +39,17 @@ export function DocumentsCard({
   onRemove,
   onRegistrationChange,
   onPreviousAdd,
-  acceptRegistration = "application/pdf,image/*",
-  acceptPrevious = "application/pdf",
+  // More permissive defaults (handle missing MIME by allowing extensions too)
+  acceptRegistration = "application/pdf,image/*,.pdf,.png,.jpg,.jpeg",
+  acceptPrevious = "application/pdf,.pdf",
   maxSizeMBRegistration = 20,
   maxSizeMBPrevious = 50,
   registrationError,
   previousError,
 }: DocumentsCardProps) {
-  // Local preview URL for registration (image only)
+  /* ============================ Local UI state ============================ */
+
+  // Local preview URL for registration (only if image/*)
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null);
   const [dragReg, setDragReg] = React.useState(false);
   const [dragPrev, setDragPrev] = React.useState(false);
@@ -49,9 +59,108 @@ export function DocumentsCard({
   const regInputRef = React.useRef<HTMLInputElement>(null);
   const prevInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Handle preview lifecycle
+  /* ========================== Derived helpers (safe) ========================== */
+
+  // Always return a string for mime; never undefined
+  const getMime = (f?: File): string => {
+    const t = (f as any)?.type;
+    return typeof t === "string" ? t : "";
+  };
+
+  // Always return a lowercased extension WITH dot (".pdf") or "" if none
+  const getExt = (f?: File): string => {
+    const n = (f as any)?.name;
+    if (typeof n !== "string") return "";
+    const dot = n.lastIndexOf(".");
+    return dot >= 0 ? n.slice(dot).toLowerCase() : "";
+  };
+
+  // Should we show an image preview?
+  const isImage = (f?: File): boolean => {
+    const mime = getMime(f);
+    return mime.startsWith("image/");
+  };
+
+  // Short, human label for a file when it’s not an image (e.g., "PDF", "PNG", or "FILE")
+  const badgeLabel = (f?: File): string => {
+    const mime = getMime(f);
+    if (mime) {
+      const parts = mime.split("/");
+      const second = parts.length > 1 ? parts[1] : parts[0];
+      if (second) return second.toUpperCase();
+    }
+    const ext = getExt(f); // ".pdf" -> "PDF"
+    if (ext) return ext.slice(1).toUpperCase();
+    return "FILE";
+  };
+
+  // Format size like "1.2 MB"
+  const formatBytes = (n?: number) => {
+    if (!Number.isFinite(n as number)) return "";
+    const units = ["B", "KB", "MB", "GB"];
+    let i = 0;
+    let val = n as number;
+    while (val >= 1024 && i < units.length - 1) {
+      val /= 1024;
+      i++;
+    }
+    return `${val.toFixed(1)} ${units[i]}`;
+  };
+
+  /**
+   * Minimal accept matcher that tolerates missing MIME and falls back to extension.
+   * Supports:
+   *   - Exact mimes   e.g. "application/pdf"
+   *   - Wildcards     e.g. "image/*"
+   *   - Extensions    e.g. ".pdf"
+   *   - Comma lists   e.g. "application/pdf,.pdf,image/*"
+   */
+  const matchesAccept = (file: File, accept: string): boolean => {
+    if (!accept) return true;
+
+    const patterns = accept
+      .split(",")
+      .map((p) => p.trim().toLowerCase())
+      .filter(Boolean);
+
+    const mime = getMime(file).toLowerCase(); // "" if unknown
+    const ext = getExt(file).toLowerCase();   // "" if none
+
+    for (const p of patterns) {
+      // Wildcard like "image/*"
+      if (p.endsWith("/*")) {
+        const base = p.slice(0, -2); // "image"
+        if (mime && mime.startsWith(base + "/")) return true;
+        // If no MIME, we cannot check wildcard reliably. Continue.
+        continue;
+      }
+
+      // Extension like ".pdf"
+      if (p.startsWith(".")) {
+        if (ext && ext === p) return true;
+        continue;
+      }
+
+      // Exact MIME like "application/pdf"
+      // If MIME available, compare directly.
+      if (mime && mime === p) return true;
+
+      // Heuristic fallback: if we lack MIME, allow a few common equivalences by extension.
+      // (Keeps it simple; extend if you need more types.)
+      if (!mime && p === "application/pdf" && ext === ".pdf") return true;
+      if (!mime && p === "image/png" && ext === ".png") return true;
+      if (!mime && p === "image/jpeg" && (ext === ".jpg" || ext === ".jpeg")) return true;
+    }
+
+    // Last resort: if still nothing matched, reject.
+    return false;
+  };
+
+  /* ============================ Effects / lifecycle ============================ */
+
+  // Build a preview URL for image registration file; revoke when changed
   React.useEffect(() => {
-    if (registrationCertFile && registrationCertFile.type.startsWith("image/")) {
+    if (registrationCertFile && isImage(registrationCertFile)) {
       const url = URL.createObjectURL(registrationCertFile);
       setPreviewUrl(url);
       return () => URL.revokeObjectURL(url);
@@ -59,7 +168,7 @@ export function DocumentsCard({
     setPreviewUrl(null);
   }, [registrationCertFile]);
 
-  /* ------------------------------ Helpers ------------------------------ */
+  /* ================================ Handlers ================================ */
 
   const resetInput = (ref: React.RefObject<HTMLInputElement | null>) => {
     if (ref.current) {
@@ -97,17 +206,19 @@ export function DocumentsCard({
   const handlePrevFiles = (list: FileList | File[]) => {
     const arr = Array.from(list);
     const accepted: File[] = [];
+
     for (const f of arr) {
       if (!matchesAccept(f, acceptPrevious)) {
-        setInternalPrevError(`Unsupported type: ${f.name}`);
+        setInternalPrevError(`Unsupported type: ${((f as any)?.name as string) || "(unnamed file)"}`);
         continue;
       }
       if (f.size > maxSizeMBPrevious * 1024 * 1024) {
-        setInternalPrevError(`File exceeds ${maxSizeMBPrevious} MB: ${f.name}`);
+        setInternalPrevError(`File exceeds ${maxSizeMBPrevious} MB: ${((f as any)?.name as string) || "(unnamed file)"}`);
         continue;
       }
       accepted.push(f);
     }
+
     if (accepted.length) {
       setInternalPrevError(undefined);
       onPreviousAdd?.(accepted);
@@ -140,7 +251,7 @@ export function DocumentsCard({
     e.preventDefault(); e.stopPropagation(); setDragPrev(false);
   };
 
-  /* ------------------------------- Render ------------------------------- */
+  /* ================================= Render ================================= */
 
   return (
     <div className="rounded-xl border border-white/20 bg-white/30 backdrop-blur-md shadow-md">
@@ -177,12 +288,12 @@ export function DocumentsCard({
                 previewUrl ? (
                   <img
                     src={previewUrl}
-                    alt={registrationCertFile.name}
+                    alt={(registrationCertFile as any)?.name || "preview"}
                     className="h-12 w-12 rounded-md object-cover border border-white/40 bg-white/60"
                   />
                 ) : (
                   <div className="h-12 w-12 rounded-md border border-white/40 bg-white/60 flex items-center justify-center text-xs text-gray-700">
-                    {(registrationCertFile.type.split("/")[1] || "FILE").toUpperCase()}
+                    {badgeLabel(registrationCertFile)}
                   </div>
                 )
               ) : (
@@ -193,7 +304,7 @@ export function DocumentsCard({
 
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-900 truncate">
-                  {registrationCertFile ? registrationCertFile.name : "Drag & drop or click to select"}
+                  {(registrationCertFile as any)?.name || "Drag & drop or click to select"}
                 </p>
                 <p className="text-xs text-gray-600">
                   Accepted: <span className="font-medium">{acceptRegistration}</span> · Max {maxSizeMBRegistration}MB
@@ -296,13 +407,15 @@ export function DocumentsCard({
             <ul className="mt-3 space-y-2">
               {previousReportFiles.map((file, idx) => (
                 <li
-                  key={`${file.name}-${idx}`}
+                  key={`${((file as any)?.name as string) ?? "file"}-${idx}`}
                   className="flex items-center justify-between rounded-lg border border-white/30 bg-white/60 backdrop-blur px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-gray-900">{file.name}</p>
+                    <p className="truncate text-sm text-gray-900">
+                      {((file as any)?.name as string) || "(unnamed file)"}
+                    </p>
                     <p className="text-xs text-gray-600">
-                      {(file.type || "application/octet-stream")} · {formatBytes(file.size)}
+                      {(getMime(file) || "application/octet-stream")} · {formatBytes((file as any)?.size)}
                     </p>
                   </div>
                   <button
@@ -322,39 +435,4 @@ export function DocumentsCard({
       </div>
     </div>
   );
-}
-
-/* ------------------------------ Utilities ------------------------------ */
-
-function formatBytes(n?: number) {
-  if (!n && n !== 0) return "";
-  const units = ["B", "KB", "MB", "GB"];
-  let i = 0;
-  let val = n;
-  while (val >= 1024 && i < units.length - 1) {
-    val /= 1024;
-    i++;
-  }
-  return `${val.toFixed(1)} ${units[i]}`;
-}
-
-/** Minimal accept matcher (handles "image/*" and ".ext" patterns) */
-function matchesAccept(file: File, accept: string): boolean {
-  if (!accept) return true;
-  const parts = accept.split(",").map((p) => p.trim().toLowerCase());
-  const mime = (file.type || "").toLowerCase();
-  const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
-  for (const p of parts) {
-    if (p.endsWith("/*")) {
-      const base = p.slice(0, -2);
-      if (mime.startsWith(base)) return true;
-    } else if (p.startsWith(".")) {
-      if (ext === p) return true;
-    } else {
-      if (mime === p) return true;
-    }
-  }
-  // If the file has no type, fallback to extension rule
-  if (!mime && parts.some((p) => p.startsWith(".") && p === ext)) return true;
-  return false;
 }

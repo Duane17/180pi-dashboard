@@ -247,6 +247,8 @@ export function SocialStep() {
         ? {
             amount: social.community.inKindDonations.amount ?? null,
             currency: social.community.inKindDonations.currency ?? "",
+            description: social.community.inKindDonations.description ?? "",
+
             }
         : undefined,
         estimatedBeneficiaries: social.community?.estimatedBeneficiaries ?? null,

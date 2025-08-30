@@ -592,7 +592,7 @@ export const SocialSchema = z.object({
       .object({
         amount: nonNegDecimal(),
         currency: z.string().max(8), 
-        description: z.string().max(255).nullable().optional(), // NEW field
+        description: z.string().max(255).nullable().optional(),
       })
       .optional(),
 

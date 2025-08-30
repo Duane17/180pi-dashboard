@@ -86,6 +86,40 @@ function uid() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function DateField({
+  label,
+  value,
+  onChange,
+  readOnly,
+}: {
+  label: string;
+  value?: string;
+  onChange: (v: string | undefined) => void;
+  readOnly?: boolean;
+}) {
+  // ensure the input always receives either "" or YYYY-MM-DD
+  const v =
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)
+      ? value.slice(0, 10)
+      : "";
+  return (
+    <label className="block">
+      <div className="mb-1 text-sm text-gray-700">{label}</div>
+      <input
+        type="date"
+        value={v}
+        onChange={(e) => {
+          const next = e.target.value; // already YYYY-MM-DD or ""
+          onChange(next ? next : undefined);
+        }}
+        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none"
+        disabled={readOnly}
+      />
+    </label>
+  );
+}
+
+
 /* ============================ Component ============================ */
 
 export function GovernanceBodyCard({ value, onChange }: Props) {
@@ -310,12 +344,12 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
                   min={0}
                   onChange={(n) => update({ tenureYears: n ?? null })}
                 />
-                <TextField
-                  label="Appointment date (ISO)"
-                  value={row.appointedAt ?? ""}
-                  onChange={(v) => update({ appointedAt: v ?? "" })}
-                  placeholder="YYYY-MM-DD"
+                <DateField
+                  label="Appointment date"
+                  value={row.appointedAt}
+                  onChange={(v) => update({ appointedAt: v })}
                 />
+
 
                 {/* Committees checkboxes */}
                 <div className="lg:col-span-3">
@@ -417,20 +451,20 @@ export function GovernanceBodyCard({ value, onChange }: Props) {
             }
             allowEmpty
           />
-          <TextField
-            label="Date (ISO)"
-            value={evalVal.date ?? ""}
+          <DateField
+            label="Date"
+            value={evalVal.date}
             onChange={(v) =>
               onChange({
                 boardEvaluation: {
                   conducted: evalVal.conducted,
                   type: evalVal.type,
-                  date: v ?? "",
+                  date: v, 
                 },
               })
             }
-            placeholder="YYYY-MM-DD"
           />
+
         </div>
         {evalVal.conducted === "yes" && (evalNeedsType || evalNeedsDate) && (
           <p className="mt-2 text-xs text-red-600">

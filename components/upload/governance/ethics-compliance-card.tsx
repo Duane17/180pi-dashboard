@@ -10,6 +10,7 @@ import {
 } from "@/components/upload/env/ui";
 import { Chip } from "../social/ui/chip";
 import { CURRENCIES } from "@/constants/foundational.constants";
+import { PolicyRow } from "./ui/policy-row";
 /* ============================== Types ============================== */
 
 type CurrencyLike = string | { value?: string; code?: string; label?: string; name?: string };
@@ -74,6 +75,13 @@ export type EthicsComplianceValue = {
 type Props = {
   value: EthicsComplianceValue;
   onChange: (patch: Partial<EthicsComplianceValue>) => void;
+  readOnly?: boolean;
+};
+
+type PolicyRowProps = {
+  label: string;
+  row: PolicyEntry;
+  onPatch: (patch: Partial<PolicyEntry>) => void;
   readOnly?: boolean;
 };
 
@@ -163,57 +171,6 @@ export function EthicsComplianceCard({ value, onChange, readOnly }: Props) {
     onChange({ politicalContributions: next });
   };
 
-  // Helpers for policy rows
-  const PolicyRow = ({
-    label,
-    k,
-  }: {
-    label: string;
-    k:
-      | "codeOfConduct"
-      | "antiCorruption"
-      | "conflictOfInterest"
-      | "whistleblowing"
-      | "relatedParty"
-      | "giftsHospitality"
-      | "dataPrivacy";
-  }) => {
-    const row = policies[k] ?? { exists: false };
-    return (
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-        <label className="inline-flex items-center gap-2 text-sm text-gray-800">
-          <input
-            type="checkbox"
-            className="h-4 w-4"
-            checked={!!row.exists}
-            onChange={(e) => patchPolicies(k, { exists: e.target.checked })}
-            disabled={readOnly}
-          />
-          {label}
-        </label>
-        <div>
-          <label className="block text-sm text-gray-800 mb-1">Date</label>
-          <input
-            type="date"
-            className="block w-full rounded-lg border border-gray-300/70 bg-white/70 px-3 py-2 text-sm text-gray-800 shadow-sm backdrop-blur focus:outline-none disabled:opacity-60"
-            value={row.date ?? ""}
-            onChange={(e) => patchPolicies(k, { date: e.target.value ?? "" })}
-            disabled={readOnly}
-          />
-        </div>
-
-        <div className="sm:col-span-2">
-          <TextField
-            label="URL (optional)"
-            value={row.url ?? ""}
-            onChange={(v) => patchPolicies(k, { url: v ?? "" })}
-            placeholder="https://…"
-          />
-        </div>
-      </div>
-    );
-  };
-
   // Training coverage hints
   const pctHint = "Enter 0–100 (optional)";
 
@@ -232,15 +189,51 @@ export function EthicsComplianceCard({ value, onChange, readOnly }: Props) {
       {/* Policies matrix */}
       <div className="rounded-2xl border border-white/30 bg-white/50 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
         <SectionHeader title="Policies" />
-        <div className="mt-3 space-y-3">
-          <PolicyRow label="Code of Conduct"       k="codeOfConduct" />
-          <PolicyRow label="Anti-corruption & Bribery" k="antiCorruption" />
-          <PolicyRow label="Conflict of Interest"   k="conflictOfInterest" />
-          <PolicyRow label="Whistleblowing"         k="whistleblowing" />
-          <PolicyRow label="Related-Party Transactions" k="relatedParty" />
-          <PolicyRow label="Gifts & Hospitality"    k="giftsHospitality" />
-          <PolicyRow label="Data Privacy"           k="dataPrivacy" />
-        </div>
+          <div className="mt-3 space-y-3">
+            <PolicyRow
+              label="Code of Conduct"
+              row={policies.codeOfConduct}
+              onPatch={(p) => patchPolicies("codeOfConduct", p)}
+              readOnly={readOnly}
+            />
+            <PolicyRow
+              label="Anti-corruption & Bribery"
+              row={policies.antiCorruption}
+              onPatch={(p) => patchPolicies("antiCorruption", p)}
+              readOnly={readOnly}
+            />
+            <PolicyRow
+              label="Conflict of Interest"
+              row={policies.conflictOfInterest}
+              onPatch={(p) => patchPolicies("conflictOfInterest", p)}
+              readOnly={readOnly}
+            />
+            <PolicyRow
+              label="Whistleblowing"
+              row={policies.whistleblowing}
+              onPatch={(p) => patchPolicies("whistleblowing", p)}
+              readOnly={readOnly}
+            />
+            <PolicyRow
+              label="Related-Party Transactions"
+              row={policies.relatedParty}
+              onPatch={(p) => patchPolicies("relatedParty", p)}
+              readOnly={readOnly}
+            />
+            <PolicyRow
+              label="Gifts & Hospitality"
+              row={policies.giftsHospitality}
+              onPatch={(p) => patchPolicies("giftsHospitality", p)}
+              readOnly={readOnly}
+            />
+            <PolicyRow
+              label="Data Privacy"
+              row={policies.dataPrivacy}
+              onPatch={(p) => patchPolicies("dataPrivacy", p)}
+              readOnly={readOnly}
+            />
+          </div>
+
 
         <div className="mt-4 rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">
           <div className="flex flex-wrap items-center gap-2">

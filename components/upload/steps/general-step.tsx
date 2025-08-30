@@ -90,6 +90,8 @@ export function GeneralStep() {
   const toISODate = (d?: string | Date) =>
     typeof d === "string" ? d : d ? new Date(d).toISOString().slice(0, 10) : undefined;
 
+  
+
   const updateCompanyBasics = (partial: Partial<CompanyBasicsValues>) =>
     setValue(
       "general.companyBasics",
@@ -178,7 +180,16 @@ export function GeneralStep() {
 
 
   // DisclosurePeriodsCard adapter (Date-based per schema)
-  const periodsValue: DisclosurePeriodsValues = safeGeneral.disclosurePeriods;
+  // Normalize disclosure periods for <input type="date">
+  const periodsValue: DisclosurePeriodsValues = {
+    ...safeGeneral.disclosurePeriods,
+    sustainabilityPeriodStart: toISODate(safeGeneral.disclosurePeriods?.sustainabilityPeriodStart as any),
+    sustainabilityPeriodEnd:   toISODate(safeGeneral.disclosurePeriods?.sustainabilityPeriodEnd as any),
+    financialPeriodStart:      toISODate(safeGeneral.disclosurePeriods?.financialPeriodStart as any),
+    financialPeriodEnd:        toISODate(safeGeneral.disclosurePeriods?.financialPeriodEnd as any),
+    dateOfInformation:         toISODate(safeGeneral.disclosurePeriods?.dateOfInformation as any),
+  };
+
 
   const onPeriodsChange = (partial: Partial<DisclosurePeriodsValues>) => {
     setValue(
@@ -192,14 +203,18 @@ export function GeneralStep() {
   const contactValue = {
     contactName: safeGeneral.disclosureContact.contactName ?? "",
     contactEmail: safeGeneral.disclosureContact.contactEmail ?? "",
-    // phone intentionally not modeled in schema (ignored)
-    contactPhone: "",
+    contactRole:  (safeGeneral as any).disclosureContact?.contactRole ?? "",
   };
-  const onContactChange = (partial: { contactName?: string; contactEmail?: string; contactPhone?: string }) => {
+  const onContactChange = (partial: { contactName?: string; contactEmail?: string; contactRole?: string; }) => {
     const next = { ...safeGeneral.disclosureContact };
     if (partial.contactName !== undefined) next.contactName = partial.contactName;
     if (partial.contactEmail !== undefined) next.contactEmail = partial.contactEmail;
-    setValue("general.disclosureContact", next, { shouldDirty: true });
+    if (partial.contactRole  !== undefined) (next as any).contactRole = partial.contactRole;
+    setValue("general.disclosureContact", next, {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
   };
 
   // Documents handlers
@@ -304,15 +319,6 @@ export function GeneralStep() {
 
         {/* Context */}
         <div className="grid grid-cols-1 gap-6">
-          {/* <ValueChainCard
-            value={safeGeneral.valueChain}
-            onChange={updateValueChain}
-            errors={sectionErrors<typeof safeGeneral.valueChain>(gErrors?.valueChain, [
-              "valueChainScopes",
-              "businessRelations",
-            ])}
-          /> */}
-
           <SupplyChainContextCard
             value={safeGeneral.supplyChain}
             onChange={updateSupplyChain}
@@ -329,7 +335,7 @@ export function GeneralStep() {
         <div className="grid grid-cols-1 gap-6">
           <DisclosureAndRestatementCard
             value={{
-              disclosurePeriods: safeGeneral.disclosurePeriods,
+              disclosurePeriods: periodsValue,
               firstRestatement: safeGeneral.firstRestatement,
             }}
             onChange={(partial) => {
@@ -363,6 +369,7 @@ export function GeneralStep() {
             errors={{
               contactName: gErrors?.disclosureContact?.contactName?.message,
               contactEmail: gErrors?.disclosureContact?.contactEmail?.message,
+              contactRole:  (gErrors?.disclosureContact as any)?.contactRole?.message,
             }}
           />
 

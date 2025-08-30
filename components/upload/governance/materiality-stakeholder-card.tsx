@@ -81,6 +81,8 @@ function isSelected(arr: StakeholderKey[], k: StakeholderKey) {
 function toggle(arr: StakeholderKey[], k: StakeholderKey): StakeholderKey[] {
   return isSelected(arr, k) ? arr.filter((x) => x !== k) : [...arr, k];
 }
+
+
 function fmtStatus(done?: YesNoPlanned): "done" | "planned" | "not_done" {
   if (done === "yes") return "done";
   if (done === "planned") return "planned";
@@ -146,14 +148,24 @@ export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props)
     isPreset ? (methodStr as MethodPreset) : methodStr ? "Other" : undefined;
   const showMethodOther = methodSelectValue === "Other";
 
+  
+
   // Handlers
   const patchAssessment = (p: Partial<Assessment>) =>
     onChange({ assessment: { ...assessment, ...p } });
 
+
   const toggleStakeholder = (k: StakeholderKey) => {
     if (readOnly) return;
-    onChange({ stakeholderGroups: toggle(stakeholders, k) });
+    const next = toggle(stakeholders, k);
+    // If turning OFF "other", also clear the text to avoid stale values
+    if (k === "other" && !next.includes("other")) {
+      onChange({ stakeholderGroups: next, otherStakeholderText: "" });
+    } else {
+      onChange({ stakeholderGroups: next });
+    }
   };
+
 
   const addTopic = () =>
     onChange({ topMaterialTopics: [...topics, " "] });
@@ -269,7 +281,8 @@ export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props)
           ))}
         </div>
 
-        {/* Other text when “other” selected */}
+      {/* Other text when “other” selected */}
+      {stakeholders.includes("other") && (
         <div className="mt-3 grid grid-cols-1 gap-3 sm:max-w-xl">
           <TextField
             label="If 'Other', specify"
@@ -278,9 +291,12 @@ export function MaterialityStakeholderCard({ value, onChange, readOnly }: Props)
             placeholder="e.g., NGOs, media, academia"
           />
           {needsOtherText && (
-            <p className="text-xs text-red-600">Please specify the “Other” stakeholder group.</p>
+            <p className="text-xs text-red-600">
+              Please specify the “Other” stakeholder group.
+            </p>
           )}
         </div>
+      )}
 
         {/* Derived count */}
         <div className="mt-3 rounded-xl border border-white/30 bg-white/50 p-3 text-xs shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/40">

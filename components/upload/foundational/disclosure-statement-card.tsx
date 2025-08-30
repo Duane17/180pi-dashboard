@@ -2,20 +2,27 @@
 "use client";
 
 import * as React from "react";
-import type {
-  DisclosurePeriodsValues,
-  FirstRestatementValues,
-} from "@/schemas/foundational.schemas";
+import type { FirstRestatementValues } from "@/schemas/foundational.schemas";
 import { RESTATEMENT_REASONS, FREQUENCY_OPTIONS } from "@/constants/foundational.constants";
 
 /** -----------------------------
  * Types
  * ------------------------------*/
-type PeriodErrors = Partial<Record<keyof DisclosurePeriodsValues, string | undefined>>;
+type DisclosurePeriodsUI = {
+  sustainabilityPeriodStart?: string;
+  sustainabilityPeriodEnd?: string;
+  financialPeriodStart?: string;
+  financialPeriodEnd?: string;
+  periodDifferenceReason?: string;
+  dateOfInformation?: string;
+  frequency?: "ANNUAL" | "BIENNIAL" | "AD_HOC";
+};
+
+type PeriodErrors = Partial<Record<keyof DisclosurePeriodsUI, string | undefined>>;
 type RestatementErrors = Partial<Record<keyof FirstRestatementValues, string | undefined>>;
 
 export interface DisclosureAndRestatementValue {
-  disclosurePeriods: DisclosurePeriodsValues;
+  disclosurePeriods: DisclosurePeriodsUI; 
   firstRestatement: FirstRestatementValues;
 }
 
@@ -102,7 +109,7 @@ export function DisclosureAndRestatementCard({
 
   // Generic period handlers
   const handlePeriodField =
-    <K extends keyof DisclosurePeriodsValues>(key: K) =>
+    <K extends keyof DisclosurePeriodsUI>(key: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       onChange({
         disclosurePeriods: {

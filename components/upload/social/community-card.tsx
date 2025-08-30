@@ -56,6 +56,7 @@ function normalizeDonation(d: Donation | undefined): Donation | undefined {
 
 /* --------------------------------- card -------------------------------- */
 
+
 export function CommunityCard({ value, onChange, readOnly }: Props) {
   const cash = value.cashDonations ?? EMPTY_DONATION;
   const inKind = value.inKindDonations ?? { ...EMPTY_DONATION, description: "" };
@@ -88,13 +89,15 @@ export function CommunityCard({ value, onChange, readOnly }: Props) {
   };
   const patchInKind = (p: Partial<CommunityValue["inKindDonations"]>) => {
     const next = { ...inKind, ...p };
-    const hasAmount = next.amount != null;
+    const hasAmount   = next.amount != null;
     const hasCurrency = !!next.currency?.trim();
-    const hasDesc = !!next.description?.trim();
+    const hasDesc     = !!next.description?.trim();
+
     onChange({
       inKindDonations: hasAmount || hasCurrency || hasDesc ? next : undefined,
     });
   };
+
 
   return (
     <div className="space-y-6">
@@ -166,8 +169,8 @@ export function CommunityCard({ value, onChange, readOnly }: Props) {
             <div className="sm:col-span-2">
               <TextField
                 label="Description"
-                value={inKind.description ?? ""}
-                onChange={(v) => patchInKind({ description: v })}
+                value={inKind.description ?? undefined}
+                onChange={(v) => patchInKind({ description: (v ?? "") })}
                 placeholder="e.g., food supplies, equipment, clothing"
               />
             </div>

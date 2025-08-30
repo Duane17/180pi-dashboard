@@ -9,8 +9,6 @@ import { GHGInventoryCard } from "@/components/upload/env/ghg-inventory-card";
 import { ResourceConsumptionCard } from "@/components/upload/env/resource-consumption-card";
 import { WaterFlowsCard } from "@/components/upload/env/waterflows-card";
 import { WasteCard } from "../env/waste-card";
-
-// ⬇️ NEW: import your Biodiversity card (and its payload type if you want strict typing)
 import { BiodiversityCard, type BiodiversityPayload } from "@/components/upload/env/biodiversity-card";
 
 export function EnvironmentStep() {

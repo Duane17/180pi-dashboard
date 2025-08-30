@@ -18,6 +18,14 @@ const upper2 = z
   .max(2)
   .transform((s) => s.toUpperCase());
 
+const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use yyyy-mm-dd");
+
+const ymdCoerced = z
+  .union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/), z.coerce.date()])
+  .transform((v) =>
+    typeof v === "string" ? v : new Date(v).toISOString().slice(0, 10)
+  );
+
 // ---------------------------
 // Enums (match frontend intent)
 // ---------------------------
@@ -100,14 +108,14 @@ export const PoliciesMapSchema = z.record(PolicyKeyEnum, PolicyStatusSchema).opt
 
 export const CertificationSchema = z.object({
   issuer: z.string().max(200).optional(),
-  issuingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use yyyy-mm-dd").optional(),
+  issuingDate: ymdCoerced.optional(),
   file: z.instanceof(File).nullable().optional(),
 });
 
 
 export const AuditInfoSchema = z.object({
   issuer: z.string().trim().max(200).optional(),
-  issuingDate: z.coerce.date().optional(),
+  issuingDate: ymdCoerced.optional(),
   file: z.instanceof(File).nullable().optional(),
 });
 
@@ -211,63 +219,42 @@ export const ReportingFrequencyEnum = z.enum(["ANNUAL", "BIENNIAL", "AD_HOC"]);
 
 export const DisclosurePeriodsSchema = z
   .object({
-    sustainabilityPeriodStart: z.coerce.date().optional(),
-    sustainabilityPeriodEnd: z.coerce.date().optional(),
-    financialPeriodStart: z.coerce.date().optional(),
-    financialPeriodEnd: z.coerce.date().optional(),
+    sustainabilityPeriodStart: ymd.optional(),
+    sustainabilityPeriodEnd: ymd.optional(),
+    financialPeriodStart: ymd.optional(),
+    financialPeriodEnd: ymd.optional(),
     periodDifferenceReason: z.string().max(2000).optional(),
-    dateOfInformation: z.coerce.date().optional(),
+    dateOfInformation: ymd.optional(),
     frequency: ReportingFrequencyEnum.optional(),
-
   })
   .superRefine((val, ctx) => {
-    // If one sustainability date is provided, require the other
+    // paired requirement checks (strings)
     if (val.sustainabilityPeriodStart && !val.sustainabilityPeriodEnd) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Sustainability period end is required when start is set.",
-        path: ["sustainabilityPeriodEnd"],
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["sustainabilityPeriodEnd"], message: "Sustainability period end is required when start is set." });
     }
     if (val.sustainabilityPeriodEnd && !val.sustainabilityPeriodStart) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Sustainability period start is required when end is set.",
-        path: ["sustainabilityPeriodStart"],
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["sustainabilityPeriodStart"], message: "Sustainability period start is required when end is set." });
     }
 
-    // If one financial date is provided, require the other
     if (val.financialPeriodStart && !val.financialPeriodEnd) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Financial period end is required when start is set.",
-        path: ["financialPeriodEnd"],
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["financialPeriodEnd"], message: "Financial period end is required when start is set." });
     }
     if (val.financialPeriodEnd && !val.financialPeriodStart) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Financial period start is required when end is set.",
-        path: ["financialPeriodStart"],
-      });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["financialPeriodStart"], message: "Financial period start is required when end is set." });
     }
 
-    // If both pairs exist and differ, require a reason
+    // difference reason check (compare strings)
     const hasS = !!val.sustainabilityPeriodStart && !!val.sustainabilityPeriodEnd;
     const hasF = !!val.financialPeriodStart && !!val.financialPeriodEnd;
     if (hasS && hasF) {
-      const sStart = val.sustainabilityPeriodStart!.getTime();
-      const sEnd = val.sustainabilityPeriodEnd!.getTime();
-      const fStart = val.financialPeriodStart!.getTime();
-      const fEnd = val.financialPeriodEnd!.getTime();
-      const different = sStart !== fStart || sEnd !== fEnd;
+      const different =
+        val.sustainabilityPeriodStart !== val.financialPeriodStart ||
+        val.sustainabilityPeriodEnd !== val.financialPeriodEnd;
       if (different && !val.periodDifferenceReason) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message:
-            "Please provide a reason when financial and sustainability periods differ.",
           path: ["periodDifferenceReason"],
+          message: "Please provide a reason when financial and sustainability periods differ.",
         });
       }
     }
@@ -276,6 +263,7 @@ export const DisclosurePeriodsSchema = z
 export const DisclosureContactSchema = z.object({
   contactName: z.string().max(200).optional(),
   contactEmail: z.string().email().max(320).optional(),
+  contactRole: z.string().max(200).optional(),
   // contactEmailVerified is server-driven; omit from client schema
 });
 
